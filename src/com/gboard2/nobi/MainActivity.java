@@ -31,9 +31,10 @@ public class MainActivity extends Activity {
     private FrameLayout contentContainer;
     private HomeTab tabHome;
     private ThemesTab tabThemes;
+    private CustomizeTab tabCustomize;
     private SettingsTab tabSettings;
     
-    private TextView textHome, textThemes, textSettings;
+    private TextView textHome, textThemes, textCustomize, textSettings;
     private SharedPreferences prefs;
 
     @Override
@@ -49,48 +50,45 @@ public class MainActivity extends Activity {
         FrameLayout rootFrame = new FrameLayout(this);
         rootFrame.setBackgroundColor(Color.parseColor(UIHelpers.COLOR_BG));
         
-        // --- MAIN CONTENT (Header + Tabs) ---
+        // --- MAIN CONTENT (Tabs Container without the old Header) ---
         LinearLayout mainContent = new LinearLayout(this);
         mainContent.setOrientation(LinearLayout.VERTICAL);
         
-        // Horizontal Header Row
-        LinearLayout headerRow = new LinearLayout(this);
-        headerRow.setOrientation(LinearLayout.HORIZONTAL);
-        headerRow.setGravity(Gravity.CENTER_VERTICAL);
-        headerRow.setPadding(UIHelpers.dpToPx(this, 24), UIHelpers.dpToPx(this, 32), UIHelpers.dpToPx(this, 24), UIHelpers.dpToPx(this, 16));
-        
-        // Title Layout (Left side)
-        LinearLayout titleLayout = new LinearLayout(this);
-        titleLayout.setOrientation(LinearLayout.VERTICAL);
-        
-        TextView title = new TextView(this);
-        title.setText("Gboard Pro");
-        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 28);
-        title.setTextColor(Color.parseColor(UIHelpers.COLOR_TEXT_PRIMARY));
-        title.setTypeface(null, Typeface.BOLD);
-        
-        TextView subtitle = new TextView(this);
-        subtitle.setText("Customize your typing experience");
-        subtitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
-        subtitle.setTextColor(Color.parseColor(UIHelpers.COLOR_TEXT_SECONDARY));
-        subtitle.setPadding(0, UIHelpers.dpToPx(this, 4), 0, 0);
-        
-        titleLayout.addView(title);
-        titleLayout.addView(subtitle);
-        
-        headerRow.addView(titleLayout, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        // --- CONTENT CONTAINER ---
+        contentContainer = new FrameLayout(this);
+        LinearLayout.LayoutParams contentParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f);
+        // Added small top margin to prevent overlapping with status bar since the header is gone
+        contentParams.topMargin = UIHelpers.dpToPx(this, 12); 
+        mainContent.addView(contentContainer, contentParams);
 
-        // --- CUSTOM DRAWN KEYBOARD ICON (Top Right Corner) ---
+        // Initialize Tabs
+        tabHome = new HomeTab(this, prefs, new Runnable() {
+            @Override
+            public void run() {
+                switchTab(1);
+            }
+        });
+        tabThemes = new ThemesTab(this, prefs);
+        tabCustomize = new CustomizeTab(this);
+        tabSettings = new SettingsTab(this, prefs);
+        
+        contentContainer.addView(tabHome);
+        contentContainer.addView(tabThemes);
+        contentContainer.addView(tabCustomize);
+        contentContainer.addView(tabSettings);
+
+        rootFrame.addView(mainContent, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
+        // --- FLOATING TEST KEYBOARD ICON (Top Right Corner) ---
         LinearLayout testIconContainer = new LinearLayout(this);
         testIconContainer.setGravity(Gravity.CENTER);
         
         GradientDrawable bgCircle = new GradientDrawable();
         bgCircle.setShape(GradientDrawable.OVAL);
-        bgCircle.setColor(Color.parseColor("#E3F2FD")); // Light blue accent background
+        bgCircle.setColor(Color.parseColor("#E3F2FD")); 
         if (Build.VERSION.SDK_INT >= 16) testIconContainer.setBackground(bgCircle);
         else testIconContainer.setBackgroundDrawable(bgCircle);
 
-        // Drawing custom keyboard shape directly via Canvas (No emojis/symbols)
         View customKeyboardIcon = new View(this) {
             Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
 
@@ -134,30 +132,11 @@ public class MainActivity extends Activity {
             }
         });
 
-        // Add container to header
-        headerRow.addView(testIconContainer, new LinearLayout.LayoutParams(UIHelpers.dpToPx(this, 44), UIHelpers.dpToPx(this, 44)));
-        mainContent.addView(headerRow);
-
-        // --- CONTENT CONTAINER ---
-        contentContainer = new FrameLayout(this);
-        LinearLayout.LayoutParams contentParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f);
-        mainContent.addView(contentContainer, contentParams);
-
-        // Initialize Tabs
-        tabHome = new HomeTab(this, prefs, new Runnable() {
-            @Override
-            public void run() {
-                switchTab(1);
-            }
-        });
-        tabThemes = new ThemesTab(this, prefs);
-        tabSettings = new SettingsTab(this, prefs);
-        
-        contentContainer.addView(tabHome);
-        contentContainer.addView(tabThemes);
-        contentContainer.addView(tabSettings);
-
-        rootFrame.addView(mainContent, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        // Add as a floating element on top of everything
+        FrameLayout.LayoutParams testIconParams = new FrameLayout.LayoutParams(UIHelpers.dpToPx(this, 44), UIHelpers.dpToPx(this, 44));
+        testIconParams.gravity = Gravity.TOP | Gravity.END;
+        testIconParams.setMargins(0, UIHelpers.dpToPx(this, 16), UIHelpers.dpToPx(this, 16), 0);
+        rootFrame.addView(testIconContainer, testIconParams);
 
         // --- FLOATING BOTTOM NAVIGATION ---
         LinearLayout bottomNavWrapper = new LinearLayout(this);
@@ -169,7 +148,7 @@ public class MainActivity extends Activity {
 
         LinearLayout bottomNav = new LinearLayout(this);
         bottomNav.setOrientation(LinearLayout.HORIZONTAL);
-        bottomNav.setWeightSum(3f); // Changed from 4f to 3f
+        bottomNav.setWeightSum(4f); 
 
         GradientDrawable navBg = new GradientDrawable();
         navBg.setColor(Color.parseColor(UIHelpers.COLOR_CARD));
@@ -180,7 +159,8 @@ public class MainActivity extends Activity {
 
         bottomNav.addView(createNavItem("🏠", "Home", 0), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         bottomNav.addView(createNavItem("🎨", "Themes", 1), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        bottomNav.addView(createNavItem("⚙️", "Settings", 2), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)); // Index changed to 2
+        bottomNav.addView(createNavItem("🛠️", "Customize", 2), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)); 
+        bottomNav.addView(createNavItem("⚙️", "Settings", 3), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)); 
 
         bottomNavWrapper.addView(bottomNav, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
@@ -207,7 +187,7 @@ public class MainActivity extends Activity {
         container.addView(title);
         
         final EditText editText = new EditText(this);
-        editText.setHint("Type here to test themes & sounds...");
+        editText.setHint("Type here to test layouts & themes...");
         editText.setTextColor(Color.parseColor(UIHelpers.COLOR_TEXT_PRIMARY));
         editText.setHintTextColor(Color.parseColor(UIHelpers.COLOR_TEXT_SECONDARY));
         
@@ -227,7 +207,6 @@ public class MainActivity extends Activity {
         
         final AlertDialog dialog = builder.create();
         
-        // Remove default white background of the dialog to match theme
         if (dialog.getWindow() != null) {
             GradientDrawable windowBg = new GradientDrawable();
             windowBg.setColor(Color.parseColor(UIHelpers.COLOR_CARD));
@@ -267,7 +246,8 @@ public class MainActivity extends Activity {
 
         if (index == 0) textHome = text;
         else if (index == 1) textThemes = text;
-        else if (index == 2) textSettings = text; // Mapped to 2 instead of 3
+        else if (index == 2) textCustomize = text; 
+        else if (index == 3) textSettings = text;  
 
         item.addView(icon);
         item.addView(text);
@@ -295,10 +275,12 @@ public class MainActivity extends Activity {
     private void switchTab(int index) {
         tabHome.setVisibility(View.GONE);
         tabThemes.setVisibility(View.GONE);
+        tabCustomize.setVisibility(View.GONE);
         tabSettings.setVisibility(View.GONE);
         
         textHome.setTextColor(Color.parseColor(UIHelpers.COLOR_TEXT_SECONDARY));
         textThemes.setTextColor(Color.parseColor(UIHelpers.COLOR_TEXT_SECONDARY));
+        textCustomize.setTextColor(Color.parseColor(UIHelpers.COLOR_TEXT_SECONDARY));
         textSettings.setTextColor(Color.parseColor(UIHelpers.COLOR_TEXT_SECONDARY));
 
         View activeTab = null;
@@ -311,6 +293,9 @@ public class MainActivity extends Activity {
             textThemes.setTextColor(Color.parseColor(UIHelpers.COLOR_ACCENT));
             tabThemes.render();
         } else if (index == 2) {
+            activeTab = tabCustomize;
+            textCustomize.setTextColor(Color.parseColor(UIHelpers.COLOR_ACCENT));
+        } else if (index == 3) {
             activeTab = tabSettings;
             textSettings.setTextColor(Color.parseColor(UIHelpers.COLOR_ACCENT));
         }

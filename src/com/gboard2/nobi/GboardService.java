@@ -358,14 +358,54 @@ public class GboardService extends InputMethodService {
         keyboardView.setKeyboardListener(new ProKeyboardView.KeyboardListener() {
             @Override
             public void onKeyClick(String rawKey) {
+                if (rawKey == null) return;
+                
                 InputConnection ic = getCurrentInputConnection();
-                if (ic == null || rawKey == null) return;
+                if (ic == null) return;
 
-                // --- CUSTOM KEYCAFE LOGIC ---
+                // --- CUSTOM KEYCAFE ADVANCED LOGIC WITH NORMALIZATION ---
                 CustomKeyManager ckm = CustomKeyManager.getInstance(GboardService.this);
+                String actionType = ckm.getActionType(rawKey);
                 String customValue = ckm.getValue(rawKey);
-                if (customValue != null && !customValue.isEmpty()) {
-                    ic.commitText(customValue, 1);
+
+                if (actionType != null && !actionType.equals("DEFAULT")) {
+                    switch (actionType) {
+                        case "WRITE":
+                            if (customValue != null && !customValue.isEmpty()) ic.commitText(customValue, 1);
+                            break;
+                        case "DELETE":
+                        case "BACKSPACE":
+                            GboardService.this.sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL);
+                            break;
+                        case "SPACE":
+                            ic.commitText(" ", 1);
+                            break;
+                        case "ENTER":
+                            EditorInfo editorInfo = getCurrentInputEditorInfo();
+                            int action = editorInfo.imeOptions & EditorInfo.IME_MASK_ACTION;
+                            boolean isMultiLine = (editorInfo.inputType & InputType.TYPE_TEXT_FLAG_MULTI_LINE) != 0;
+                            if (isMultiLine || editorInfo.inputType == InputType.TYPE_NULL || action == EditorInfo.IME_ACTION_NONE || action == EditorInfo.IME_ACTION_UNSPECIFIED) {
+                                ic.commitText("\n", 1);
+                            } else {
+                                ic.performEditorAction(action);
+                            }
+                            break;
+                        case "SELECT_ALL":
+                            ic.performContextMenuAction(android.R.id.selectAll);
+                            break;
+                        case "COPY":
+                            ic.performContextMenuAction(android.R.id.copy);
+                            break;
+                        case "CUT":
+                            ic.performContextMenuAction(android.R.id.cut);
+                            break;
+                        case "PASTE":
+                            ic.performContextMenuAction(android.R.id.paste);
+                            break;
+                        case "SEARCH":
+                            ic.performEditorAction(EditorInfo.IME_ACTION_SEARCH);
+                            break;
+                    }
                     updateAutoCaps(ic);
                     return;
                 }

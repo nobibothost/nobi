@@ -41,7 +41,8 @@ public class HomeTab extends ScrollView {
         this.sampleSoundManager = new SoundManager(context);
 
         setClipToPadding(false);
-        setPadding(0, dpToPx(8), 0, dpToPx(100));
+        // Changed top padding to 0 so the new stylish header flushes to the top
+        setPadding(0, 0, 0, dpToPx(100));
         
         container = new LinearLayout(context);
         container.setOrientation(LinearLayout.VERTICAL);
@@ -52,7 +53,31 @@ public class HomeTab extends ScrollView {
 
     public void render() {
         container.removeAllViews();
-        buildUI();
+        buildTabHeader(); // Add the stylish Main Header first
+        buildUI();        // Then add the rest of your original content
+    }
+
+    // --- NEW: TAB HEADER ---
+    private void buildTabHeader() {
+        LinearLayout headerContainer = new LinearLayout(context);
+        headerContainer.setOrientation(LinearLayout.VERTICAL);
+        headerContainer.setPadding(dpToPx(24), dpToPx(24), dpToPx(24), dpToPx(16));
+
+        TextView title = new TextView(context);
+        title.setText("Dashboard");
+        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 28f);
+        title.setTextColor(Color.parseColor("#111111"));
+        title.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
+        headerContainer.addView(title);
+
+        TextView subtitle = new TextView(context);
+        subtitle.setText("Welcome to Gboard Pro. Monitor your stats and active features.");
+        subtitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f);
+        subtitle.setTextColor(Color.parseColor("#78909C"));
+        subtitle.setPadding(0, dpToPx(4), 0, 0);
+        headerContainer.addView(subtitle);
+
+        container.addView(headerContainer);
     }
 
     private void buildUI() {
@@ -118,7 +143,6 @@ public class HomeTab extends ScrollView {
             LinearLayout itemBox = new LinearLayout(context);
             itemBox.setOrientation(LinearLayout.VERTICAL);
             itemBox.setGravity(Gravity.CENTER);
-            // Uniform padding to center content perfectly
             itemBox.setPadding(dpToPx(8), dpToPx(10), dpToPx(8), dpToPx(10));
             
             GradientDrawable bg = new GradientDrawable();
@@ -127,10 +151,8 @@ public class HomeTab extends ScrollView {
             bg.setStroke(dpToPx(isApplied ? 2 : 1), Color.parseColor(isApplied ? UIHelpers.COLOR_ACCENT : "#CFD8DC"));
             itemBox.setBackground(bg);
 
-            // Add Mini Keyboard Preview
             View preview = createThemePreview(theme);
             LinearLayout.LayoutParams pParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dpToPx(45));
-            // Only bottom margin to separate from text
             pParams.bottomMargin = dpToPx(8);
             itemBox.addView(preview, pParams);
 
@@ -165,18 +187,15 @@ public class HomeTab extends ScrollView {
                 float w = getWidth(); float h = getHeight();
                 float r = dpToPx(4);
 
-                // BG
                 p.setColor(theme.bgColor);
                 canvas.drawRoundRect(new RectF(0, 0, w, h), r, r, p);
 
-                // Keys
                 p.setColor(theme.keyBgColor);
                 float kw = (w - dpToPx(10)) / 5f;
                 float kh = (h - dpToPx(8)) / 3f;
                 for(int i=0; i<5; i++) {
                     canvas.drawRoundRect(new RectF(dpToPx(2) + i*(kw+dpToPx(1.5f)), dpToPx(2), dpToPx(2) + i*(kw+dpToPx(1.5f)) + kw, dpToPx(2)+kh), dpToPx(1), dpToPx(1), p);
                 }
-                // Space
                 p.setColor(theme.enterBgColor);
                 canvas.drawRoundRect(new RectF(w*0.25f, h-kh-dpToPx(2), w*0.75f, h-dpToPx(2)), dpToPx(1), dpToPx(1), p);
             }
@@ -184,7 +203,6 @@ public class HomeTab extends ScrollView {
     }
 
     private void buildSoundsGrid(LinearLayout parent) {
-        // Volume Slider with sample sound on change
         LinearLayout volumeRow = new LinearLayout(context);
         volumeRow.setOrientation(LinearLayout.HORIZONTAL);
         volumeRow.setGravity(Gravity.CENTER_VERTICAL);
@@ -267,7 +285,6 @@ public class HomeTab extends ScrollView {
             LinearLayout itemBox = new LinearLayout(context);
             itemBox.setOrientation(LinearLayout.VERTICAL);
             itemBox.setGravity(Gravity.CENTER);
-            // Uniform padding to center preview and text perfectly
             itemBox.setPadding(dpToPx(8), dpToPx(12), dpToPx(8), dpToPx(12));
             
             GradientDrawable bg = new GradientDrawable();
@@ -276,10 +293,8 @@ public class HomeTab extends ScrollView {
             bg.setStroke(dpToPx(isApplied ? 2 : 1), Color.parseColor(isApplied ? UIHelpers.COLOR_ACCENT : "#CFD8DC"));
             itemBox.setBackground(bg);
 
-            // Add Animated Preview View
             View previewView = createEffectPreviewView(effectName, isApplied);
             LinearLayout.LayoutParams pParams = new LinearLayout.LayoutParams(dpToPx(36), dpToPx(36));
-            // Bottom margin to separate icon from text
             pParams.bottomMargin = dpToPx(8);
             itemBox.addView(previewView, pParams);
 
@@ -395,7 +410,6 @@ public class HomeTab extends ScrollView {
         LinearLayout b = new LinearLayout(context);
         b.setOrientation(LinearLayout.VERTICAL); 
         b.setGravity(Gravity.CENTER);
-        // Uniform padding to center text
         b.setPadding(dpToPx(8), dpToPx(14), dpToPx(8), dpToPx(14));
         
         GradientDrawable g = new GradientDrawable();

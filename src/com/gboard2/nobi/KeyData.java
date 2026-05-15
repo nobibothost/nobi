@@ -16,6 +16,11 @@ public class KeyData {
     public float rippleAlpha = 0f;
     public float scaleProgress = 0f;
 
+    // --- Custom Action Fields ---
+    public String customLabel = null;
+    public String actionType = "DEFAULT"; 
+    public String actionValue = "";       
+
     public KeyData(String label, RectF bounds) {
         this.label = label;
         this.code = label;
@@ -28,5 +33,13 @@ public class KeyData {
         this.code = code;
         this.altCode = altCode;
         this.bounds = new RectF();
+    }
+
+    // Helper method to get the correct label to draw
+    public String getDisplayLabel() {
+        if (customLabel != null && !customLabel.trim().isEmpty()) {
+            return customLabel;
+        }
+        return label;
     }
 }

@@ -66,7 +66,7 @@ public class ProKeyboardView extends FrameLayout {
         toolbarManager = new ToolbarManager(context, this);
         layoutManager = new KeyboardLayoutManager(this);
         popupRenderer = new PopupRenderer(this);
-        renderer = new KeyboardRenderer(this);
+        renderer = new KeyboardRenderer(this); // Standard renderer for typing
         touchHandler = new KeyboardTouchHandler(this);
         
         soundManager = new SoundManager(context);
@@ -205,43 +205,21 @@ public class ProKeyboardView extends FrameLayout {
         renderer.draw(canvas);
 
         CustomKeyManager ckm = CustomKeyManager.getInstance(getContext());
-
-        // Draw Custom Long Press Hints (Shows Center Slot symbol)
-        for (KeyData key : keys) {
-            String[] customLp = ckm.getPopups(key.label);
-            if (customLp != null && !customLp[0].isEmpty()) {
-                Paint hintPaint = new Paint(themeManager.textPaint);
-                hintPaint.setTypeface(android.graphics.Typeface.DEFAULT);
-                hintPaint.clearShadowLayer();
-                hintPaint.setTextSize(dpToPx(10) * resizeController.userHeightScale);
-                
-                if(themeManager.activeTheme != null) {
-                    hintPaint.setColor(themeManager.activeTheme.suggestionTextColor);
-                } else {
-                    hintPaint.setColor(Color.parseColor("#4A90E2"));
-                }
-                canvas.drawText(customLp[0], key.bounds.right - dpToPx(8), key.bounds.top + dpToPx(12), hintPaint);
-            }
-        }
         
-        // --- CUSTOM KEYCAFE VISUAL CROSS POPUP INJECTION (BUG FIXED) ---
+        // BUG FIX: Removed the buggy hint drawing loop from here. Now handled securely by the Renderers!
+
         if (touchHandler != null && touchHandler.activeKey != null && touchHandler.isLongPressTriggered && !resizeController.isResizing) {
             boolean isEmojiLongPress = java.util.Arrays.asList(TOP_ROW_EMOJIS).contains(touchHandler.activeKey.label);
-            
-            // Ye fetch karega aapka proper 5-array
             String[] customPopups = ckm.getPopups(touchHandler.activeKey.label);
             
             if (customPopups != null) {
                 if (swipeSymbolManager != null) {
-                    // Agar koi slot khali hai, toh fallback logic use hoga.
-                    // Par agar aapne specific alag symbols dale hain, toh strictly wahi array draw hoga.
                     String center = (customPopups[0] != null && !customPopups[0].isEmpty()) ? customPopups[0] : touchHandler.activeKey.label;
                     String up = (customPopups[1] != null && !customPopups[1].isEmpty()) ? customPopups[1] : center;
                     String down = (customPopups[2] != null && !customPopups[2].isEmpty()) ? customPopups[2] : center;
                     String left = (customPopups[3] != null && !customPopups[3].isEmpty()) ? customPopups[3] : center;
                     String right = (customPopups[4] != null && !customPopups[4].isEmpty()) ? customPopups[4] : center;
 
-                    // Passes the PROPER 5 different things to the popup renderer!
                     swipeSymbolManager.swipeSymbols.put(touchHandler.activeKey.label, new String[]{center, up, down, left, right});
                     popupRenderer.drawPopupPreview(canvas, touchHandler.activeKey);
                 }

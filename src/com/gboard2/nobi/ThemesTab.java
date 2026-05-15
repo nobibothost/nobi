@@ -26,7 +26,7 @@ public class ThemesTab extends ScrollView {
 
     private Context context;
     private SharedPreferences prefs;
-    private LinearLayout container;
+    private LinearLayout gridContainer; // The container holding the theme cards
 
     public ThemesTab(Context context, SharedPreferences prefs) {
         super(context);
@@ -34,20 +34,46 @@ public class ThemesTab extends ScrollView {
         this.prefs = prefs;
 
         setClipToPadding(false);
-        setPadding(0, UIHelpers.dpToPx(context, 8), 0, UIHelpers.dpToPx(context, 100));
+        // Changed top padding to 0 so the header is flush with the top
+        setPadding(0, 0, 0, UIHelpers.dpToPx(context, 100));
         
-        container = new LinearLayout(context);
-        container.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout mainLayout = new LinearLayout(context);
+        mainLayout.setOrientation(LinearLayout.VERTICAL);
 
-        // Container padding for overall grid margins
-        container.setPadding(UIHelpers.dpToPx(context, 10), 0, UIHelpers.dpToPx(context, 10), 0);
-        addView(container);
+        // --- NEW: TAB HEADER ---
+        LinearLayout headerContainer = new LinearLayout(context);
+        headerContainer.setOrientation(LinearLayout.VERTICAL);
+        headerContainer.setPadding(UIHelpers.dpToPx(context, 24), UIHelpers.dpToPx(context, 24), UIHelpers.dpToPx(context, 24), UIHelpers.dpToPx(context, 16));
+
+        TextView title = new TextView(context);
+        title.setText("Themes");
+        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 28f);
+        title.setTextColor(Color.parseColor("#111111"));
+        title.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
+        headerContainer.addView(title);
+
+        TextView subtitle = new TextView(context);
+        subtitle.setText("Customize the look, colors, and background of your keyboard.");
+        subtitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f);
+        subtitle.setTextColor(Color.parseColor("#78909C"));
+        subtitle.setPadding(0, UIHelpers.dpToPx(context, 4), 0, 0);
+        headerContainer.addView(subtitle);
+
+        mainLayout.addView(headerContainer);
+
+        // Grid Container to hold your original theme cards
+        gridContainer = new LinearLayout(context);
+        gridContainer.setOrientation(LinearLayout.VERTICAL);
+        gridContainer.setPadding(UIHelpers.dpToPx(context, 10), 0, UIHelpers.dpToPx(context, 10), 0);
+        mainLayout.addView(gridContainer);
+        
+        addView(mainLayout);
         
         render();
     }
 
     public void render() {
-        container.removeAllViews();
+        gridContainer.removeAllViews(); // Clear only the grid items, header stays intact
 
         List<ThemeData.Theme> themes = ThemeData.getThemes();
         String currentThemeName = prefs.getString("selected_theme", "Default");
@@ -55,21 +81,17 @@ public class ThemesTab extends ScrollView {
         LinearLayout currentRow = null;
 
         for (int i = 0; i < themes.size(); i++) {
-            // Har even index (0, 2, 4...) par ek nayi row banegi 2 columns ke liye
             if (i % 2 == 0) {
                 currentRow = new LinearLayout(context);
                 currentRow.setOrientation(LinearLayout.HORIZONTAL);
                 currentRow.setWeightSum(2f);
-                container.addView(currentRow, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+                gridContainer.addView(currentRow, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
             }
 
             final ThemeData.Theme theme = themes.get(i);
-
             boolean isApplied = theme.name.equals(currentThemeName);
             
-            // Custom Card container specifically sized for Grid
             LinearLayout card = new LinearLayout(context);
-
             card.setOrientation(LinearLayout.VERTICAL);
             
             GradientDrawable bg = new GradientDrawable();
@@ -77,7 +99,6 @@ public class ThemesTab extends ScrollView {
             bg.setCornerRadius(UIHelpers.dpToPx(context, 12));
             if (isApplied) {
                 bg.setStroke(UIHelpers.dpToPx(context, 2), Color.parseColor(UIHelpers.COLOR_ACCENT));
-
             }
             if (Build.VERSION.SDK_INT >= 16) card.setBackground(bg);
             else card.setBackgroundDrawable(bg);
@@ -90,14 +111,10 @@ public class ThemesTab extends ScrollView {
             cardParams.setMargins(UIHelpers.dpToPx(context, 10), UIHelpers.dpToPx(context, 10), UIHelpers.dpToPx(context, 10), UIHelpers.dpToPx(context, 10));
             card.setLayoutParams(cardParams);
 
-            // Scaled down preview for grid format
             View preview = createKeyboardPreview(theme);
-
             card.addView(preview, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, UIHelpers.dpToPx(context, 80)));
             
-            // Info Layout (Centered)
             LinearLayout infoRow = new LinearLayout(context);
-
             infoRow.setOrientation(LinearLayout.VERTICAL);
             infoRow.setGravity(Gravity.CENTER);
             infoRow.setPadding(0, UIHelpers.dpToPx(context, 12), 0, 0);
@@ -106,21 +123,17 @@ public class ThemesTab extends ScrollView {
             name.setText(theme.name);
             name.setTextColor(Color.parseColor(isApplied ? UIHelpers.COLOR_ACCENT : UIHelpers.COLOR_TEXT_PRIMARY));
             name.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
-
             name.setTypeface(null, Typeface.BOLD);
             name.setGravity(Gravity.CENTER);
             infoRow.addView(name, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
             
-            // Badge container setup to keep heights even if badge is missing
             LinearLayout badgeContainer = new LinearLayout(context);
-
             badgeContainer.setGravity(Gravity.CENTER);
             LinearLayout.LayoutParams badgeParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, UIHelpers.dpToPx(context, 24));
             badgeParams.topMargin = UIHelpers.dpToPx(context, 4);
 
             if (isApplied) {
                 TextView badge = new TextView(context);
-
                 badge.setText("ACTIVE");
                 badge.setTextColor(Color.WHITE);
                 badge.setTextSize(TypedValue.COMPLEX_UNIT_SP, 9);
@@ -129,17 +142,14 @@ public class ThemesTab extends ScrollView {
                 
                 GradientDrawable badgeBg = new GradientDrawable();
                 badgeBg.setColor(Color.parseColor(UIHelpers.COLOR_ACCENT));
-
                 badgeBg.setCornerRadius(UIHelpers.dpToPx(context, 10));
                 if (Build.VERSION.SDK_INT >= 16) badge.setBackground(badgeBg);
                 else badge.setBackgroundDrawable(badgeBg);
                 
                 badgeContainer.addView(badge);
-
             }
             
             infoRow.addView(badgeContainer, badgeParams);
-
             card.addView(infoRow);
             
             card.setOnClickListener(new View.OnClickListener() {
@@ -147,18 +157,15 @@ public class ThemesTab extends ScrollView {
                 public void onClick(View v) {
                     v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
                     prefs.edit().putString("selected_theme", theme.name).apply();
-                    
-                    render(); // Instantly re-render grid
+                    render(); 
                 }
             });
 
             currentRow.addView(card);
         }
 
-        // Agar list items odd number hain, to aakhiri row me ek invisible dummy view daalna hoga space equal rakhne ke liye
         if (themes.size() % 2 != 0 && currentRow != null) {
             View dummy = new View(context);
-
             LinearLayout.LayoutParams dummyParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f);
             currentRow.addView(dummy, dummyParams);
         }
@@ -167,7 +174,6 @@ public class ThemesTab extends ScrollView {
     private View createKeyboardPreview(final ThemeData.Theme theme) {
         return new View(context) {
             Paint bgPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-
             Paint keyPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
             Paint specPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
             Paint entPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -183,7 +189,6 @@ public class ThemesTab extends ScrollView {
                 
                 int w = getWidth(); int h = getHeight();
 
-                // Draw Background (Image or Solid)
                 if (theme.backgroundImageRes != 0) {
                     try {
                         Drawable bgDrawable = context.getResources().getDrawable(theme.backgroundImageRes, null);
@@ -204,17 +209,14 @@ public class ThemesTab extends ScrollView {
                 }
                 
                 float pad = UIHelpers.dpToPx(context, 2.5f);
-
                 float keyH = (h - (pad * 5)) / 4f;
                 float keyW = (w - (pad * 11)) / 10f;
-
                 float rad = UIHelpers.dpToPx(context, 3);
                 
                 float startX = pad; float y = pad;
 
                 for(int i=0; i<10; i++) {
                     canvas.drawRoundRect(new RectF(startX, y, startX+keyW, y+keyH), rad, rad, keyPaint);
-
                     startX += keyW + pad;
                 }
                 startX = pad + (keyW/2f);
@@ -222,7 +224,6 @@ public class ThemesTab extends ScrollView {
                 y += keyH + pad;
                 for(int i=0; i<9; i++) {
                     canvas.drawRoundRect(new RectF(startX, y, startX+keyW, y+keyH), rad, rad, keyPaint);
-
                     startX += keyW + pad;
                 }
                 startX = pad;
@@ -234,7 +235,6 @@ public class ThemesTab extends ScrollView {
                 startX += shiftW + pad;
                 for(int i=0; i<7; i++) {
                     canvas.drawRoundRect(new RectF(startX, y, startX+keyW, y+keyH), rad, rad, keyPaint);
-
                     startX += keyW + pad;
                 }
                 float delW = w - startX - pad;
@@ -258,7 +258,6 @@ public class ThemesTab extends ScrollView {
 
                 float entW = w - startX - pad;
                 canvas.drawRoundRect(new RectF(startX, y, startX+entW, y+keyH), rad, rad, entPaint);
-
             }
         };
     }
