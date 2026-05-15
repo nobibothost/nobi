@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Gboard Pro Nobi</string>
+    <string name="enable_keyboard">1. Enable Keyboard Settings</string>
+    <string name="select_keyboard">2. Select Active Keyboard</string>
+</resources>

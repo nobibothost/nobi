@@ -1,0 +1,382 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#F0F2F5">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="64dp"
+        android:text="Gboard Settings"
+        android:textSize="22sp"
+        android:textStyle="bold"
+        android:gravity="center_vertical"
+        android:paddingStart="20dp"
+        android:textColor="#FFFFFF"
+        android:background="#4A90E2"
+        android:elevation="4dp"/>
+
+    <FrameLayout
+        android:id="@+id/content_frame"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <ScrollView
+            android:id="@+id/tab_themes"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="visible">
+            <LinearLayout
+                android:id="@+id/theme_grid_container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="12dp"/>
+        </ScrollView>
+
+        <LinearLayout
+            android:id="@+id/tab_customize"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:visibility="gone">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🛠️"
+                android:textSize="80sp"/>
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Advanced Customization\nComing Soon"
+                android:gravity="center"
+                android:textSize="18sp"
+                android:textColor="#90A4AE"/>
+        </LinearLayout>
+
+        <FrameLayout
+            android:id="@+id/tab_settings"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:id="@+id/settings_main_menu"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:padding="16dp"
+                android:visibility="visible">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="SETTINGS"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:textColor="#4A90E2"
+                    android:layout_marginBottom="8dp"/>
+
+                <LinearLayout
+                    android:id="@+id/menu_user_setup"
+                    android:layout_width="match_parent"
+                    android:layout_height="64dp"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:background="#FFFFFF"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp"
+                    android:elevation="2dp"
+                    android:layout_marginBottom="12dp"
+                    android:clickable="true"
+                    android:focusable="true">
+                    
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="User Setup"
+                        android:textColor="#263238"
+                        android:textSize="16sp"
+                        android:textStyle="bold"/>
+                        
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="➔"
+                        android:textColor="#90A4AE"
+                        android:textSize="18sp"/>
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/menu_general_settings"
+                    android:layout_width="match_parent"
+                    android:layout_height="64dp"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:background="#FFFFFF"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp"
+                    android:elevation="2dp"
+                    android:clickable="true"
+                    android:focusable="true">
+                    
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="General Settings"
+                        android:textColor="#263238"
+                        android:textSize="16sp"
+                        android:textStyle="bold"/>
+                        
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="➔"
+                        android:textColor="#90A4AE"
+                        android:textSize="18sp"/>
+                </LinearLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/settings_user_setup"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:visibility="gone"
+                android:background="#F0F2F5">
+                
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:background="#FFFFFF"
+                    android:elevation="2dp">
+                    <TextView
+                        android:id="@+id/back_user_setup"
+                        android:layout_width="wrap_content"
+                        android:layout_height="match_parent"
+                        android:gravity="center"
+                        android:padding="16dp"
+                        android:text="⬅ Back"
+                        android:textColor="#4A90E2"
+                        android:textStyle="bold"
+                        android:clickable="true"/>
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="User Setup"
+                        android:textSize="18sp"
+                        android:textColor="#263238"
+                        android:textStyle="bold"
+                        android:layout_marginStart="8dp"/>
+                </LinearLayout>
+                
+                <ScrollView
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent">
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical"
+                            android:background="#FFFFFF"
+                            android:padding="12dp"
+                            android:elevation="2dp"
+                            android:layout_marginBottom="24dp">
+                            
+                            <Button
+                                android:id="@+id/btn_enable"
+                                android:layout_width="match_parent"
+                                android:layout_height="52dp"
+                                android:text="1. Enable In Settings"
+                                android:textAllCaps="false"
+                                android:backgroundTint="#4A90E2"
+                                android:textColor="#FFFFFF"/>
+
+                            <Button
+                                android:id="@+id/btn_select"
+                                android:layout_width="match_parent"
+                                android:layout_height="52dp"
+                                android:layout_marginTop="8dp"
+                                android:text="2. Select Gboard Pro"
+                                android:textAllCaps="false"
+                                android:backgroundTint="#4A90E2"
+                                android:textColor="#FFFFFF"/>
+                        </LinearLayout>
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="KEYBOARD TEST AREA"
+                            android:textSize="12sp"
+                            android:textStyle="bold"
+                            android:textColor="#4A90E2"
+                            android:layout_marginBottom="8dp"/>
+
+                        <EditText
+                            android:layout_width="match_parent"
+                            android:layout_height="120dp"
+                            android:hint="Type here to test keyboard..."
+                            android:gravity="top"
+                            android:padding="12dp"
+                            android:background="#FFFFFF"
+                            android:textColor="#263238"
+                            android:textColorHint="#B0BEC5"
+                            android:elevation="2dp"/>
+                    </LinearLayout>
+                </ScrollView>
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/settings_general"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:visibility="gone"
+                android:background="#F0F2F5">
+                
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:background="#FFFFFF"
+                    android:elevation="2dp">
+                    <TextView
+                        android:id="@+id/back_general"
+                        android:layout_width="wrap_content"
+                        android:layout_height="match_parent"
+                        android:gravity="center"
+                        android:padding="16dp"
+                        android:text="⬅ Back"
+                        android:textColor="#4A90E2"
+                        android:textStyle="bold"
+                        android:clickable="true"/>
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="General Settings"
+                        android:textSize="18sp"
+                        android:textColor="#263238"
+                        android:textStyle="bold"
+                        android:layout_marginStart="8dp"/>
+                </LinearLayout>
+                
+                <ScrollView
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent">
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+                        
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical"
+                            android:background="#FFFFFF"
+                            android:padding="4dp"
+                            android:elevation="2dp">
+                            
+                            <CheckBox
+                                android:id="@+id/check_slang_row"
+                                android:layout_width="match_parent"
+                                android:layout_height="56dp"
+                                android:text="Shortcut / Slang Row"
+                                android:textColor="#263238"
+                                android:textSize="16sp"
+                                android:paddingStart="12dp"/>
+                            <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#F0F2F5"/>
+                            
+                            <CheckBox
+                                android:id="@+id/check_emoji_row"
+                                android:layout_width="match_parent"
+                                android:layout_height="56dp"
+                                android:text="Quick Emoji Row"
+                                android:textColor="#263238"
+                                android:textSize="16sp"
+                                android:paddingStart="12dp"/>
+                            <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#F0F2F5"/>
+
+                            <CheckBox
+                                android:id="@+id/check_number_row"
+                                android:layout_width="match_parent"
+                                android:layout_height="56dp"
+                                android:text="Number Row"
+                                android:textColor="#263238"
+                                android:textSize="16sp"
+                                android:paddingStart="12dp"/>
+                            <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#F0F2F5"/>
+
+                            <CheckBox
+                                android:id="@+id/check_replace_emoji"
+                                android:layout_width="match_parent"
+                                android:layout_height="56dp"
+                                android:text="Replace Emoji to Numbers (Symbols)"
+                                android:textColor="#263238"
+                                android:textSize="16sp"
+                                android:paddingStart="12dp"/>
+                        </LinearLayout>
+                    </LinearLayout>
+                </ScrollView>
+            </LinearLayout>
+
+        </FrameLayout>
+    </FrameLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:orientation="horizontal"
+        android:background="#FFFFFF"
+        android:elevation="12dp">
+
+        <LinearLayout
+            android:id="@+id/nav_theme"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:background="?android:attr/selectableItemBackground">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="🎨" android:textSize="20sp"/>
+            <TextView android:id="@+id/nav_theme_text" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Themes" android:textSize="12sp" android:textColor="#4A90E2" android:textStyle="bold"/>
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/nav_customize"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:background="?android:attr/selectableItemBackground">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="🛠️" android:textSize="20sp"/>
+            <TextView android:id="@+id/nav_customize_text" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Customize" android:textSize="12sp" android:textColor="#78909C"/>
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/nav_settings"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:background="?android:attr/selectableItemBackground">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="⚙️" android:textSize="20sp"/>
+            <TextView android:id="@+id/nav_settings_text" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Settings" android:textSize="12sp" android:textColor="#78909C"/>
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>
