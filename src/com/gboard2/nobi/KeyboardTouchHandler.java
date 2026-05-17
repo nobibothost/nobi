@@ -442,7 +442,8 @@ public class KeyboardTouchHandler {
                             String textToCommit = label;
                             if (label.length() == 1 && Character.isLetter(label.charAt(0)) && pkv.currentMode == ProKeyboardView.MODE_TEXT) {
                                 textToCommit = (pkv.isShifted || pkv.isCapsLock) ? label.toUpperCase() : label.toLowerCase();
-                            } else if (Arrays.asList(ProKeyboardView.TOP_ROW_SLANG).contains(label)) {
+                            // FIXED: Replaced ProKeyboardView with KeyboardData
+                            } else if (Arrays.asList(KeyboardData.TOP_ROW_SLANG).contains(label)) {
                                 textToCommit = (pkv.isShifted || pkv.isCapsLock) ? label.toUpperCase() : label.toLowerCase();
                                 textToCommit += " "; 
                             }

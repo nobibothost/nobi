@@ -52,8 +52,15 @@ public class ToolbarManager {
         SharedPreferences prefs = context.getSharedPreferences("GboardPrefs", Context.MODE_PRIVATE);
         
         String activeOrder = prefs.getString("toolbar_active_list", "TEXT_EDIT,CLIPBOARD,MIC,RESIZE");
-        String inactiveOrder = prefs.getString("toolbar_inactive_list", "THEME,FONT,SETTINGS");
+        String inactiveOrder = prefs.getString("toolbar_inactive_list", "THEME,FONT,SETTINGS,LAYOUTS");
         
+        // --- SMART INJECTION --- 
+        // Agar aapke paas pehle se list saved hai aur usme LAYOUTS nahi hai, toh ye line usko auto-add kar degi.
+        if (!activeOrder.contains("LAYOUTS") && !inactiveOrder.contains("LAYOUTS")) {
+            inactiveOrder += ",LAYOUTS";
+            prefs.edit().putString("toolbar_inactive_list", inactiveOrder).apply();
+        }
+
         loadItemsIntoList(activeOrder.split(","), activeTools);
         loadItemsIntoList(inactiveOrder.split(","), inactiveTools);
     }
@@ -71,6 +78,7 @@ public class ToolbarManager {
                 case "THEME": item.icon = pkv.themeManager.iconTheme; item.label = "Theme"; break;
                 case "CLIPBOARD": item.icon = pkv.themeManager.iconClipboard; item.label = "Clipboard"; break;
                 case "MIC": item.icon = pkv.themeManager.iconMic; item.label = "Voice"; break;
+                case "LAYOUTS": item.icon = pkv.themeManager.iconLayouts; item.label = "Layouts"; break; // Added Tool Mapping
             }
             if (item.icon != null) {
                 list.add(item);
@@ -139,7 +147,7 @@ public class ToolbarManager {
 
     public void onToolbarItemClick(String id, float cx, float cy) {
         pkv.triggerHapticFeedback();
-        isMoreFeaturesOpen = false; // Auto close expanded sheet to restore suggestions
+        isMoreFeaturesOpen = false; 
         pkv.postInvalidateOnAnimation();
         
         switch (id) {
@@ -150,6 +158,7 @@ public class ToolbarManager {
             case "RESIZE": pkv.resizeController.isResizing = true; pkv.invalidate(); break;
             case "FONT": if (pkv.fontSheet != null) pkv.fontSheet.show(cx, cy); break;
             case "SETTINGS": if (pkv.listener != null) pkv.listener.onKeyClick("CMD_OPEN_SETTINGS"); break;
+            case "LAYOUTS": if (pkv.listener != null) pkv.listener.onKeyClick("CMD_OPEN_LAYOUTS"); break; // Assigned Click Event
         }
     }
 }

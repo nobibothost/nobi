@@ -15,10 +15,15 @@ public class KeyboardLayoutManager {
 
     public float getKeyWeight(String label) {
         if (pkv.currentMode == ProKeyboardView.MODE_NUMBER) return 1.0f;
-        if (Arrays.asList(ProKeyboardView.TOP_ROW_SLANG).contains(label)) return 0.9f;
-        if (Arrays.asList(ProKeyboardView.TOP_ROW_EMOJIS).contains(label)) return 1.0f;
         
-        switch (label) {
+        CustomKeyManager ckm = CustomKeyManager.getInstance(pkv.getContext());
+        String effLabel = ckm.getLabel(label);
+        if (effLabel == null || effLabel.isEmpty()) effLabel = label;
+
+        if (Arrays.asList(KeyboardData.TOP_ROW_SLANG).contains(label)) return 0.9f;
+        if (Arrays.asList(KeyboardData.TOP_ROW_EMOJIS).contains(label)) return 1.0f;
+        
+        switch (effLabel) {
             case "SPACE": 
                 return (pkv.currentMode == ProKeyboardView.MODE_TEXT) ? 6.2f : 4.2f;
             case "ENTER": 
@@ -43,12 +48,10 @@ public class KeyboardLayoutManager {
         pkv.keys.clear();
 
         List<String[]> dynamicLayout = new ArrayList<>();
-        boolean currShowEmoji = pkv.themeManager.showEmojiRow;
-        boolean currShowNum = pkv.themeManager.showNumberRow;
         
-        if (pkv.currentMode != ProKeyboardView.MODE_TEXT) {
-            currShowEmoji = false;
-        }
+        boolean currShowEmoji = pkv.themeManager.showEmojiRow;
+        boolean currShowSlang = pkv.themeManager.showSlangRow;
+        boolean currShowNum = pkv.themeManager.showNumberRow;
 
         if (pkv.themeManager.replaceEmojiInSymbols && (pkv.currentMode == ProKeyboardView.MODE_SYMBOLS || pkv.currentMode == ProKeyboardView.MODE_SYMBOLS_PAGE_2)) {
             currShowNum = true;
@@ -60,11 +63,11 @@ public class KeyboardLayoutManager {
             dynamicLayout.add(new String[]{"7", "8", "9", "DEL"});
             dynamicLayout.add(new String[]{",", "0", ".", "ENTER"});
         } else {
-            if (pkv.themeManager.showSlangRow && pkv.currentMode == ProKeyboardView.MODE_TEXT) {
-                dynamicLayout.add(ProKeyboardView.TOP_ROW_SLANG);
+            if (currShowSlang) {
+                dynamicLayout.add(KeyboardData.TOP_ROW_SLANG);
             }
             if (currShowEmoji) {
-                dynamicLayout.add(ProKeyboardView.TOP_ROW_EMOJIS);
+                dynamicLayout.add(KeyboardData.TOP_ROW_EMOJIS);
             }
             
             if (currShowNum) {
@@ -83,7 +86,6 @@ public class KeyboardLayoutManager {
                 } else {
                     dynamicLayout.add(new String[]{"~", "`", "|", "•", "√", "π", "÷", "×", "¶", "∆"});
                 }
-                // Moved "/" from the 3rd row to the end of the 2nd row
                 dynamicLayout.add(new String[]{"@", "#", "$", "%", "&", "-", "+", "(", ")", "/"});
                 dynamicLayout.add(new String[]{"_", ".", ",", ":", ";", "'", "\"", "!", "?"});
                 dynamicLayout.add(new String[]{"=\\<", "*", "\\", "|", "<", ">", "[", "]", "DEL"});
@@ -95,7 +97,6 @@ public class KeyboardLayoutManager {
                 } else {
                     dynamicLayout.add(new String[]{"©", "®", "™", "✓", "[", "]", "{", "}", "<", ">"});
                 }
-                // Moved "/" from the 3rd row to the end of the 2nd row
                 dynamicLayout.add(new String[]{"±", "≤", "≥", "≠", "≈", "∞", "µ", "∑", "Ω", "/"});
                 dynamicLayout.add(new String[]{"_", ".", ",", ":", ";", "'", "\"", "!", "?"});
                 dynamicLayout.add(new String[]{"?123", "€", "£", "¢", "¥", "^", "°", "=", "DEL"});
@@ -136,8 +137,10 @@ public class KeyboardLayoutManager {
             float totalRowWidth = (totalWeight * baseKeyWidth) + (padding * (rowKeys.length - 1));
             float currentX = (pkv.getWidth() - totalRowWidth) / 2f;
             float currentRowHeight = (row < extraRowCount) ? (baseRowHeight * 0.7f) : baseRowHeight;
+            
             for (String label : rowKeys) {
                 float keyWidth = baseKeyWidth * getKeyWeight(label);
+                // 100% PURE: No prefix hacks. Just the original physical label.
                 RectF bounds = new RectF(currentX, currentY, currentX + keyWidth, currentY + currentRowHeight);
                 pkv.keys.add(new KeyData(label, bounds));
                 currentX += keyWidth + padding;

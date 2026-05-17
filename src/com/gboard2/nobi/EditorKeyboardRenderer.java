@@ -10,7 +10,6 @@ import android.os.SystemClock;
 import android.view.inputmethod.EditorInfo;
 import java.util.Arrays;
 
-// This renderer extends the base one, but overrides the draw method to ONLY highlight edited keys in the Editor
 public class EditorKeyboardRenderer extends KeyboardRenderer {
 
     public EditorKeyboardRenderer(ProKeyboardView pkv) {
@@ -24,8 +23,10 @@ public class EditorKeyboardRenderer extends KeyboardRenderer {
         lastFrameTime = now;
         boolean needsRedraw = false;
 
+        EditorKeyboardView edView = (EditorKeyboardView) pkv;
+
         for (KeyData key : pkv.keys) {
-            if (key.isPressed) {
+            if (key.isPressed && key != edView.draggedKey) {
                 key.scaleProgress = Math.min(1f, key.scaleProgress + dt * 15f);
                 key.rippleRadius += dt * pkv.dpToPx(350); 
                 key.rippleAlpha = Math.min(0.2f, key.rippleAlpha + dt * 4f);
@@ -43,64 +44,89 @@ public class EditorKeyboardRenderer extends KeyboardRenderer {
         } else {
             canvas.drawRect(0, 0, pkv.getWidth(), pkv.getHeight(), pkv.themeManager.bgPaint);
         }
-        
-        float toolbarHeight = pkv.getToolbarHeight();
-        canvas.drawRect(0, 0, pkv.getWidth(), toolbarHeight, pkv.themeManager.suggestionBgPaint);
-        float toolbarAreaWidth = pkv.getWidth() - toolbarHeight; 
-        
-        float cxMore = pkv.getWidth() - (toolbarHeight / 2f);
-        float cyMore = toolbarHeight / 2f;
 
         float radius = pkv.dpToPx(8);
-        pkv.touchHandler.popupKey = null; 
         CustomKeyManager ckm = CustomKeyManager.getInstance(pkv.getContext());
         
         for (KeyData key : pkv.keys) {
-            Paint currentBgPaint = pkv.themeManager.keyBgPaint;
-            boolean isSpecialKey = false;
-            boolean isEmojiKey = Arrays.asList(ProKeyboardView.TOP_ROW_EMOJIS).contains(key.label);
-            boolean isSlangKey = Arrays.asList(ProKeyboardView.TOP_ROW_SLANG).contains(key.label);
-
-            if (key.label.equals("SHIFT") || key.label.equals("DEL") || key.label.equals("?123") || 
-                key.label.equals("ABC") || key.label.equals("=\\<") || key.label.equals("LANG") || key.label.equals("EMOJI") ||
-                (pkv.currentMode == ProKeyboardView.MODE_NUMBER && (key.label.equals("-") || key.label.equals("SPACE")))) {
-                currentBgPaint = pkv.themeManager.specialKeyPaint;
-                isSpecialKey = true;
-            }
-            if (isEmojiKey || isSlangKey) { currentBgPaint = pkv.themeManager.specialKeyPaint; isSpecialKey = true; }
-            if (key.label.equals("ENTER") && !key.isPressed) currentBgPaint = pkv.themeManager.enterBgPaint;
-
             RectF drawBounds = new RectF(key.bounds);
             float currentScale = 1.0f - (key.scaleProgress * 0.04f);
             float dx = drawBounds.width() * (1f - currentScale) / 2f;
             float dy = drawBounds.height() * (1f - currentScale) / 2f;
             drawBounds.inset(dx, dy);
-            
-            // --- EDIT MODE HIGHLIGHT LOGIC ---
-            boolean isEdited = false;
-            String customAction = ckm.getActionType(key.label);
-            String customLabel = ckm.getLabel(key.label);
-            String customValue = ckm.getValue(key.label);
-            String[] customLpCheck = ckm.getPopups(key.label);
-            
-            if ((customAction != null && !customAction.equals("DEFAULT") && !customAction.equals("Write Text")) || 
-                (customLabel != null && !customLabel.trim().isEmpty()) ||
-                (customValue != null && !customValue.trim().isEmpty()) ||
-                (customLpCheck != null && customLpCheck.length > 0 && customLpCheck[0] != null && !customLpCheck[0].isEmpty())) {
-                isEdited = true;
+
+            boolean isDragged = (edView.draggedKey != null && key == edView.draggedKey);
+            boolean isTarget = (edView.targetKey != null && key == edView.targetKey);
+
+            if (isDragged) {
+                Paint faded = new Paint();
+                faded.setColor(Color.parseColor("#1A000000"));
+                canvas.drawRoundRect(drawBounds, radius, radius, faded);
+                continue; 
             }
 
-            // KEY BACKGROUND RENDERING (OVERRIDES THEME IF EDITED)
-            if (isEdited) {
-                Paint editedBg = new Paint(Paint.ANTI_ALIAS_FLAG);
-                editedBg.setColor(Color.parseColor("#E8F5E9")); 
-                canvas.drawRoundRect(drawBounds, radius, radius, editedBg);
+            String physicalLabel = key.label;
+            String effLabel = ckm.getLabel(physicalLabel);
+            if (effLabel == null || effLabel.isEmpty()) effLabel = physicalLabel;
+
+            Paint currentBgPaint = pkv.themeManager.keyBgPaint;
+            boolean isSpecialKey = false;
+            boolean isEmojiKey = Arrays.asList(KeyboardData.TOP_ROW_EMOJIS).contains(effLabel);
+            boolean isSlangKey = Arrays.asList(KeyboardData.TOP_ROW_SLANG).contains(effLabel);
+
+            if (physicalLabel.equals("SHIFT") || physicalLabel.equals("DEL") || physicalLabel.equals("?123") || 
+                physicalLabel.equals("ABC") || physicalLabel.equals("=\\<") || physicalLabel.equals("LANG") || physicalLabel.equals("EMOJI") ||
+                (pkv.currentMode == ProKeyboardView.MODE_NUMBER && (physicalLabel.equals("-") || physicalLabel.equals("SPACE")))) {
+                currentBgPaint = pkv.themeManager.specialKeyPaint;
+                isSpecialKey = true;
+            }
+            if (isEmojiKey || isSlangKey) { currentBgPaint = pkv.themeManager.specialKeyPaint; isSpecialKey = true; }
+            if (physicalLabel.equals("ENTER") && !key.isPressed) currentBgPaint = pkv.themeManager.enterBgPaint;
+
+            boolean isSwapped = ckm.isSwapped(physicalLabel);
+            boolean isEdited = false;
+            
+            String customAction = ckm.getActionType(physicalLabel);
+            String customLabel = ckm.getLabel(physicalLabel);
+            String customValue = ckm.getValue(physicalLabel);
+            String[] customLpCheck = ckm.getPopups(physicalLabel);
+            
+            boolean hasPopups = false;
+            if (customLpCheck != null) {
+                for (String p : customLpCheck) {
+                    if (p != null && !p.trim().isEmpty()) { hasPopups = true; break; }
+                }
+            }
+
+            if (hasPopups || 
+               (customAction != null && !customAction.equals("DEFAULT") && !customAction.equals("WRITE")) ||
+               (customAction != null && customAction.equals("WRITE") && customValue != null && !customValue.equalsIgnoreCase(customLabel) && customValue.length() > 1)) {
+                isEdited = true;
+            } else if (!isSwapped && customLabel != null && !customLabel.isEmpty() && !customLabel.equalsIgnoreCase(physicalLabel)) {
+                isEdited = true; 
+            }
+
+            boolean hasCustomColor = isSwapped || isEdited;
+            String bgHex = ""; String strokeHex = ""; String textHex = "";
+
+            if (isSwapped && isEdited) {
+                bgHex = "#F3E5F5"; strokeHex = "#9C27B0"; textHex = "#6A1B9A";
+            } else if (isSwapped) {
+                bgHex = "#E3F2FD"; strokeHex = "#2196F3"; textHex = "#1565C0";
+            } else if (isEdited) {
+                bgHex = "#E8F5E9"; strokeHex = "#4CAF50"; textHex = "#2E7D32";
+            }
+
+            if (hasCustomColor) {
+                Paint customBg = new Paint(Paint.ANTI_ALIAS_FLAG);
+                customBg.setColor(Color.parseColor(bgHex)); 
+                canvas.drawRoundRect(drawBounds, radius, radius, customBg);
                 
-                Paint editedStroke = new Paint(Paint.ANTI_ALIAS_FLAG);
-                editedStroke.setStyle(Paint.Style.STROKE);
-                editedStroke.setStrokeWidth(pkv.dpToPx(1.5f));
-                editedStroke.setColor(Color.parseColor("#4CAF50")); 
-                canvas.drawRoundRect(drawBounds, radius, radius, editedStroke);
+                Paint customStroke = new Paint(Paint.ANTI_ALIAS_FLAG);
+                customStroke.setStyle(Paint.Style.STROKE);
+                customStroke.setStrokeWidth(pkv.dpToPx(1.5f));
+                customStroke.setColor(Color.parseColor(strokeHex)); 
+                canvas.drawRoundRect(drawBounds, radius, radius, customStroke);
             } else {
                 if (pkv.themeManager.customKeyDrawable != null) {
                     pkv.themeManager.customKeyDrawable.setBounds((int)drawBounds.left, (int)drawBounds.top, (int)drawBounds.right, (int)drawBounds.bottom);
@@ -112,9 +138,17 @@ public class EditorKeyboardRenderer extends KeyboardRenderer {
                     }
                 }
             }
+
+            if (isTarget) {
+                Paint targetStroke = new Paint(Paint.ANTI_ALIAS_FLAG);
+                targetStroke.setStyle(Paint.Style.STROKE);
+                targetStroke.setStrokeWidth(pkv.dpToPx(3f));
+                targetStroke.setColor(Color.parseColor("#FF9800")); 
+                canvas.drawRoundRect(drawBounds, radius, radius, targetStroke);
+            }
             
             if (key.rippleAlpha > 0) {
-                if (key.label.equals("ENTER")) pkv.themeManager.ripplePaint.setColor(Color.parseColor("#FFFFFF"));
+                if (physicalLabel.equals("ENTER")) pkv.themeManager.ripplePaint.setColor(Color.parseColor("#FFFFFF"));
                 else if (isSpecialKey) pkv.themeManager.ripplePaint.setColor(Color.parseColor("#33000000")); 
                 else pkv.themeManager.ripplePaint.setColor(Color.parseColor("#22000000")); 
                 pkv.themeManager.ripplePaint.setAlpha((int) (255 * key.rippleAlpha));
@@ -127,14 +161,13 @@ public class EditorKeyboardRenderer extends KeyboardRenderer {
                 canvas.restore();
             }
 
-            // THEME OVERRIDE FOR ICONS AND TEXT IF KEY IS EDITED
-            if (key.label.equals("DEL")) drawEditorIconCenter(canvas, pkv.themeManager.iconBackspace, drawBounds, pkv.resizeController.userHeightScale, isEdited);
-            else if (key.label.equals("SHIFT")) {
+            if (physicalLabel.equals("DEL")) drawEditorIconCenter(canvas, pkv.themeManager.iconBackspace, drawBounds, pkv.resizeController.userHeightScale, hasCustomColor, textHex);
+            else if (physicalLabel.equals("SHIFT")) {
                 if (pkv.isCapsLock) pkv.themeManager.activeShiftIcon = pkv.themeManager.iconCapslock;
                 else if (pkv.isShifted) pkv.themeManager.activeShiftIcon = pkv.themeManager.iconShiftFilled; 
                 else pkv.themeManager.activeShiftIcon = pkv.themeManager.iconShift; 
-                drawEditorIconCenter(canvas, pkv.themeManager.activeShiftIcon, drawBounds, pkv.resizeController.userHeightScale, isEdited);
-            } else if (key.label.equals("ENTER")) {
+                drawEditorIconCenter(canvas, pkv.themeManager.activeShiftIcon, drawBounds, pkv.resizeController.userHeightScale, hasCustomColor, textHex);
+            } else if (physicalLabel.equals("ENTER")) {
                 Drawable actionIcon = pkv.themeManager.iconEnter;
                 switch (pkv.currentImeAction) {
                     case EditorInfo.IME_ACTION_SEARCH: actionIcon = pkv.themeManager.iconSearch; break;
@@ -142,15 +175,15 @@ public class EditorKeyboardRenderer extends KeyboardRenderer {
                     case EditorInfo.IME_ACTION_DONE: actionIcon = pkv.themeManager.iconDone; break;     
                     case EditorInfo.IME_ACTION_NEXT: actionIcon = pkv.themeManager.iconNext; break;
                 }
-                drawEditorIconCenter(canvas, actionIcon, drawBounds, pkv.resizeController.userHeightScale, isEdited);
-            } else if (key.label.equals("EMOJI")) drawEditorIconCenter(canvas, pkv.themeManager.iconEmoji, drawBounds, pkv.resizeController.userHeightScale, isEdited);
-            else if (key.label.equals("LANG")) drawEditorIconCenter(canvas, pkv.themeManager.iconLanguage, drawBounds, pkv.resizeController.userHeightScale, isEdited);
-            else if (key.label.equals("SPACE")) {
+                drawEditorIconCenter(canvas, actionIcon, drawBounds, pkv.resizeController.userHeightScale, hasCustomColor, textHex);
+            } else if (physicalLabel.equals("EMOJI")) drawEditorIconCenter(canvas, pkv.themeManager.iconEmoji, drawBounds, pkv.resizeController.userHeightScale, hasCustomColor, textHex);
+            else if (physicalLabel.equals("LANG")) drawEditorIconCenter(canvas, pkv.themeManager.iconLanguage, drawBounds, pkv.resizeController.userHeightScale, hasCustomColor, textHex);
+            else if (physicalLabel.equals("SPACE")) {
                 if (pkv.currentMode == ProKeyboardView.MODE_NUMBER) {
                     Paint p2 = new Paint(Paint.ANTI_ALIAS_FLAG);
                     p2.setStyle(Paint.Style.STROKE);
                     p2.setStrokeWidth(pkv.dpToPx(2) * pkv.resizeController.userHeightScale);
-                    p2.setColor(isEdited ? Color.parseColor("#1B5E20") : pkv.themeManager.textPaint.getColor());
+                    p2.setColor(hasCustomColor ? Color.parseColor(textHex) : pkv.themeManager.textPaint.getColor());
                     p2.setStrokeCap(Paint.Cap.ROUND);
                     p2.setStrokeJoin(Paint.Join.ROUND);
                     float ccx = drawBounds.centerX();
@@ -166,70 +199,78 @@ public class EditorKeyboardRenderer extends KeyboardRenderer {
                 } else {
                     pkv.themeManager.textPaint.setTextSize(pkv.dpToPx(14) * pkv.resizeController.userHeightScale);
                     int origColor = pkv.themeManager.textPaint.getColor();
-                    pkv.themeManager.textPaint.setColor(isEdited ? Color.parseColor("#1B5E20") : (pkv.themeManager.activeTheme != null ? pkv.themeManager.activeTheme.suggestionTextColor : Color.parseColor("#90A4AE")));
+                    pkv.themeManager.textPaint.setColor(hasCustomColor ? Color.parseColor(textHex) : (pkv.themeManager.activeTheme != null ? pkv.themeManager.activeTheme.suggestionTextColor : Color.parseColor("#90A4AE")));
                     canvas.drawText("Hinglish", drawBounds.centerX(), drawBounds.centerY() - ((pkv.themeManager.textPaint.descent() + pkv.themeManager.textPaint.ascent()) / 2), pkv.themeManager.textPaint);
                     pkv.themeManager.textPaint.setColor(origColor);
                 }
             } else {
-                String displayLabel = pkv.getDisplayLabel(key.label);
+                String displayLabel = pkv.getDisplayLabel(physicalLabel);
 
-                if (pkv.currentMode == ProKeyboardView.MODE_NUMBER && getDialerLetters(key.label) != null) {
+                if (pkv.currentMode == ProKeyboardView.MODE_NUMBER && getDialerLetters(physicalLabel) != null) {
                     int origColorNum = pkv.themeManager.textPaint.getColor();
-                    if (isEdited) pkv.themeManager.textPaint.setColor(Color.parseColor("#1B5E20"));
+                    if (hasCustomColor) pkv.themeManager.textPaint.setColor(Color.parseColor(textHex));
                     
                     pkv.themeManager.textPaint.setTextSize(pkv.dpToPx(24) * pkv.resizeController.userHeightScale);
-                    canvas.drawText(key.label, drawBounds.centerX(), drawBounds.centerY() - pkv.dpToPx(2), pkv.themeManager.textPaint);
+                    canvas.drawText(displayLabel, drawBounds.centerX(), drawBounds.centerY() - pkv.dpToPx(2), pkv.themeManager.textPaint);
                     pkv.themeManager.textPaint.setTextSize(pkv.dpToPx(10) * pkv.resizeController.userHeightScale);
                     
-                    pkv.themeManager.textPaint.setColor(isEdited ? Color.parseColor("#2E7D32") : (pkv.themeManager.activeTheme != null ? pkv.themeManager.activeTheme.suggestionTextColor : Color.parseColor("#78909C")));
-                    canvas.drawText(getDialerLetters(key.label), drawBounds.centerX(), drawBounds.centerY() + pkv.dpToPx(13), pkv.themeManager.textPaint);
-                    
+                    pkv.themeManager.textPaint.setColor(hasCustomColor ? Color.parseColor(textHex) : (pkv.themeManager.activeTheme != null ? pkv.themeManager.activeTheme.suggestionTextColor : Color.parseColor("#78909C")));
+                    canvas.drawText(getDialerLetters(physicalLabel), drawBounds.centerX(), drawBounds.centerY() + pkv.dpToPx(13), pkv.themeManager.textPaint);
                     pkv.themeManager.textPaint.setColor(origColorNum);
-                } else if (isEmojiKey) {
-                    pkv.themeManager.textPaint.setTextSize(pkv.dpToPx(22) * pkv.resizeController.userHeightScale);
-                    pkv.themeManager.textPaint.setTypeface(android.graphics.Typeface.DEFAULT);
-                    canvas.drawText(key.label, drawBounds.centerX(), drawBounds.centerY() - ((pkv.themeManager.textPaint.descent() + pkv.themeManager.textPaint.ascent()) / 2), pkv.themeManager.textPaint);
-                } else if (isSlangKey) {
-                    int origColorSlang = pkv.themeManager.textPaint.getColor();
-                    if (isEdited) pkv.themeManager.textPaint.setColor(Color.parseColor("#1B5E20"));
                     
-                    pkv.themeManager.textPaint.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
-                    float maxTextWidth = drawBounds.width() - pkv.dpToPx(4); 
-                    float textSize = pkv.dpToPx(12) * pkv.resizeController.userHeightScale;
-                    pkv.themeManager.textPaint.setTextSize(textSize);
-
-                    while (pkv.themeManager.textPaint.measureText(displayLabel) > maxTextWidth && textSize > pkv.dpToPx(6)) {
-                        textSize -= pkv.dpToPx(0.5f);
-                        pkv.themeManager.textPaint.setTextSize(textSize);
+                } else if (isEmojiKey) {
+                    pkv.themeManager.textPaint.setTextSize(pkv.dpToPx(24) * pkv.resizeController.userHeightScale);
+                    pkv.themeManager.textPaint.setTypeface(android.graphics.Typeface.DEFAULT);
+                    
+                    float maxTextWidth = drawBounds.width() - pkv.dpToPx(8);
+                    float currentSize = pkv.themeManager.textPaint.getTextSize();
+                    while (pkv.themeManager.textPaint.measureText(displayLabel) > maxTextWidth && currentSize > pkv.dpToPx(6)) {
+                        currentSize -= 1f;
+                        pkv.themeManager.textPaint.setTextSize(currentSize);
                     }
                     canvas.drawText(displayLabel, drawBounds.centerX(), drawBounds.centerY() - ((pkv.themeManager.textPaint.descent() + pkv.themeManager.textPaint.ascent()) / 2), pkv.themeManager.textPaint);
-
-                    if (isEdited) pkv.themeManager.textPaint.setColor(origColorSlang);
+                    
                 } else {
                     int origColorText = pkv.themeManager.textPaint.getColor();
-                    if (isEdited) pkv.themeManager.textPaint.setColor(Color.parseColor("#1B5E20")); 
+                    if (hasCustomColor) pkv.themeManager.textPaint.setColor(Color.parseColor(textHex)); 
                     
-                    pkv.themeManager.textPaint.setTextSize(pkv.dpToPx(displayLabel.length() > 1 ? 14 : 22) * pkv.resizeController.userHeightScale);
+                    float initialSize = pkv.dpToPx(displayLabel.length() > 1 ? 14 : 22) * pkv.resizeController.userHeightScale;
+                    pkv.themeManager.textPaint.setTextSize(initialSize);
 
-                    if (pkv.themeManager.activeFont != null && !pkv.themeManager.activeFont.name.equals("Default")) {
+                    if (isSlangKey) {
+                        pkv.themeManager.textPaint.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+                    } else if (pkv.themeManager.activeFont != null && !pkv.themeManager.activeFont.name.equals("Default")) {
                         pkv.themeManager.textPaint.setTypeface(pkv.themeManager.activeFont.keyboardTypeface);
                     } else {
                         pkv.themeManager.textPaint.setTypeface(android.graphics.Typeface.DEFAULT);
                     }
-                    canvas.drawText(displayLabel, drawBounds.centerX(), drawBounds.centerY() - ((pkv.themeManager.textPaint.descent() + pkv.themeManager.textPaint.ascent()) / 2), pkv.themeManager.textPaint);
 
-                    if (isEdited) pkv.themeManager.textPaint.setColor(origColorText);
+                    // Strict auto-fit
+                    float maxTextWidth = drawBounds.width() - pkv.dpToPx(12); 
+                    float currentTextSize = initialSize;
+                    
+                    while (pkv.themeManager.textPaint.measureText(displayLabel) > maxTextWidth && currentTextSize > pkv.dpToPx(6)) {
+                        currentTextSize -= 1f;
+                        pkv.themeManager.textPaint.setTextSize(currentTextSize);
+                    }
+                    
+                    canvas.drawText(displayLabel, drawBounds.centerX(), drawBounds.centerY() - ((pkv.themeManager.textPaint.descent() + pkv.themeManager.textPaint.ascent()) / 2), pkv.themeManager.textPaint);
+                    if (hasCustomColor) pkv.themeManager.textPaint.setColor(origColorText);
                 }
             }
 
-            // --- UNIFIED HINT RENDERING FOR EDITOR KEYBOARD ---
             String hintText = null;
-            String[] customLp = ckm.getPopups(key.label);
+            String[] customLp = ckm.getPopups(physicalLabel);
             
             if (customLp != null && customLp.length > 0 && customLp[0] != null && !customLp[0].isEmpty()) {
-                hintText = customLp[0]; // Custom Popup overrides defaults
-            } else if (pkv.currentMode == ProKeyboardView.MODE_TEXT && pkv.swipeEmojiManager != null && pkv.swipeEmojiManager.swipeEmojis.containsKey(key.label)) {
-                hintText = pkv.swipeEmojiManager.swipeEmojis.get(key.label)[0];
+                hintText = customLp[0]; 
+            } else {
+                String[] defaultPopups = KeyboardLayouts.getPopups(effLabel);
+                if (defaultPopups != null && defaultPopups.length > 0) {
+                     hintText = defaultPopups[0];
+                } else if (pkv.currentMode == ProKeyboardView.MODE_TEXT && KeyboardData.SWIPE_EMOJIS.containsKey(effLabel)) {
+                     hintText = KeyboardData.SWIPE_EMOJIS.get(effLabel)[0];
+                }
             }
 
             if (hintText != null && !hintText.isEmpty()) {
@@ -238,140 +279,125 @@ public class EditorKeyboardRenderer extends KeyboardRenderer {
                 hintPaint.clearShadowLayer();
                 hintPaint.setTextSize(pkv.dpToPx(10) * pkv.resizeController.userHeightScale);
                 
-                // Highlight Override for Editor Background
-                if (isEdited) {
-                    hintPaint.setColor(Color.parseColor("#2E7D32")); 
+                if (hasCustomColor) {
+                    hintPaint.setColor(Color.parseColor(textHex)); 
                 } else if (pkv.themeManager.activeTheme != null) {
                     hintPaint.setColor(pkv.themeManager.activeTheme.suggestionTextColor);
                 } else {
                     hintPaint.setColor(Color.parseColor("#4A90E2"));
                 }
-                
                 canvas.drawText(hintText, drawBounds.right - pkv.dpToPx(8), drawBounds.top + pkv.dpToPx(12), hintPaint);
             }
-            
-            // NOTE: The single-press tap popup logic has been completely removed 
-            // from the EditorKeyboardRenderer so no popups show up on click!
         }
-
-        int effectColor = pkv.themeManager.activeTheme != null ? pkv.themeManager.activeTheme.enterBgColor : Color.parseColor("#4A90E2");
-        pkv.touchEffectManager.updateAndDraw(canvas, dt, effectColor);
-        needsRedraw = true;
-
-        float targetPanelScale = pkv.toolbarManager.isMoreFeaturesOpen ? 1.0f : 0.0f;
-        pkv.toolbarManager.panelScale += (targetPanelScale - pkv.toolbarManager.panelScale) * 15f * dt;
-        if (Math.abs(targetPanelScale - pkv.toolbarManager.panelScale) > 0.01f) needsRedraw = true;
         
-        if (pkv.toolbarManager.panelScale > 0.01f) {
-            canvas.save();
-            float maxRadius = (float) Math.hypot(cxMore, pkv.getHeight() - cyMore);
-            float currentRadius = maxRadius * pkv.toolbarManager.panelScale;
-            
-            Path revealPath = new Path();
-            revealPath.addCircle(cxMore, cyMore, currentRadius, Path.Direction.CW);
-            canvas.clipPath(revealPath);
-            
-            canvas.drawRect(0, toolbarHeight, pkv.getWidth(), pkv.getHeight(), pkv.themeManager.bgPaint);
-            
-            float inactiveColWidth = pkv.getWidth() / 4f;
-            float inactiveRowHeight = pkv.dpToPx(80);
-
-            pkv.themeManager.textPaint.setTextSize(pkv.dpToPx(12));
-            pkv.themeManager.textPaint.clearShadowLayer(); 
-            pkv.themeManager.textPaint.setTypeface(android.graphics.Typeface.DEFAULT);
-            pkv.themeManager.textPaint.setColor(pkv.themeManager.activeTheme != null ? pkv.themeManager.activeTheme.textColor : Color.BLACK);
-
-            for (ToolbarManager.ToolbarItem item : pkv.toolbarManager.inactiveTools) {
-                if (!item.isDragging) {
-                    item.currentX += (item.targetX - item.currentX) * 15f * dt;
-                    item.currentY += (item.targetY - item.currentY) * 15f * dt;
-                    if (Math.abs(item.targetX - item.currentX) > 1f || Math.abs(item.targetY - item.currentY) > 1f) needsRedraw = true;
-                }
-                
-                float targetScale = item.isDragging ? 1.2f : (item.isPressed ? 0.85f : 1.0f);
-                item.scale += (targetScale - item.scale) * 20f * dt;
-                if (Math.abs(targetScale - item.scale) > 0.01f) needsRedraw = true;
-
-                if (!item.isDragging) {
-                    float drawY = toolbarHeight + item.currentY;
-                    RectF bounds = new RectF(item.currentX, drawY, item.currentX + inactiveColWidth, drawY + inactiveRowHeight - pkv.dpToPx(24));
-                    drawEditorIconCenter(canvas, item.icon, bounds, item.scale, false);
-                    canvas.drawText(item.label, bounds.centerX(), bounds.bottom + pkv.dpToPx(16), pkv.themeManager.textPaint);
-                }
-            }
-            canvas.restore();
+        if (edView.draggedKey != null) {
+            drawFloatingKey(canvas, edView.draggedKey, edView.dragX, edView.dragY, radius, ckm);
+            needsRedraw = true; 
         }
 
-        if (pkv.toolbarManager.activeDragItem != null && pkv.toolbarManager.activeDragItem.isDragging) {
-            Paint dragShadow = new Paint(Paint.ANTI_ALIAS_FLAG);
-            dragShadow.setColor(Color.parseColor("#33000000"));
-            
-            float renderX = pkv.toolbarManager.activeDragItem.currentX;
-            float renderY = pkv.toolbarManager.activeDragItem.currentY;
-            float sWidth = (pkv.toolbarManager.dragPointerY < toolbarHeight) ? (toolbarAreaWidth / Math.max(1, pkv.toolbarManager.activeTools.size() + 1)) : (pkv.getWidth() / 4f);
-            float sHeight = (pkv.toolbarManager.dragPointerY < toolbarHeight) ? toolbarHeight : pkv.dpToPx(80);
-            float finalRenderY = (pkv.toolbarManager.dragPointerY < toolbarHeight) ? renderY : (toolbarHeight + renderY);
-
-            RectF dragBounds = new RectF(renderX, finalRenderY, renderX + sWidth, finalRenderY + sHeight);
-            
-            canvas.drawRoundRect(dragBounds, pkv.dpToPx(8), pkv.dpToPx(8), dragShadow);
-            drawEditorIconCenter(canvas, pkv.toolbarManager.activeDragItem.icon, dragBounds, pkv.toolbarManager.activeDragItem.scale, false);
-
-            if (pkv.toolbarManager.dragPointerY >= toolbarHeight) {
-                pkv.themeManager.textPaint.setTextSize(pkv.dpToPx(12));
-                pkv.themeManager.textPaint.clearShadowLayer();
-                pkv.themeManager.textPaint.setTypeface(android.graphics.Typeface.DEFAULT);
-                canvas.drawText(pkv.toolbarManager.activeDragItem.label, dragBounds.centerX(), dragBounds.bottom - pkv.dpToPx(8), pkv.themeManager.textPaint);
-            }
-        }
-
-        if (pkv.resizeController.isResizing) {
-            canvas.drawColor(Color.parseColor("#D9000000"));
-            float resizeCx = pkv.getWidth() / 2f;
-            float resizeCy = pkv.getHeight() / 2f;
-
-            Paint dragPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-            dragPaint.setColor(Color.parseColor("#FFFFFF"));
-            canvas.drawRoundRect(resizeCx - pkv.dpToPx(30), pkv.dpToPx(10), resizeCx + pkv.dpToPx(30), pkv.dpToPx(15), pkv.dpToPx(2.5f), pkv.dpToPx(2.5f), dragPaint);
-            
-            Paint doneBg = new Paint(Paint.ANTI_ALIAS_FLAG);
-            doneBg.setColor(Color.parseColor("#4A90E2"));
-            RectF doneBounds = pkv.resizeController.getDoneButtonBounds(pkv.getWidth(), pkv.getHeight());
-            canvas.drawRoundRect(doneBounds, pkv.dpToPx(24), pkv.dpToPx(24), doneBg);
-            
-            Paint whiteText = new Paint(Paint.ANTI_ALIAS_FLAG);
-            whiteText.setColor(Color.WHITE);
-            whiteText.setTextAlign(Paint.Align.CENTER);
-            whiteText.setTextSize(pkv.dpToPx(16));
-            whiteText.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
-            canvas.drawText("Done", doneBounds.centerX(), doneBounds.centerY() - ((whiteText.descent() + whiteText.ascent()) / 2), whiteText);
-            
-            Paint hintPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-            hintPaint.setColor(Color.parseColor("#B0BEC5"));
-            hintPaint.setTextAlign(Paint.Align.CENTER);
-            hintPaint.setTextSize(pkv.dpToPx(14));
-            canvas.drawText("Drag up or down to resize keyboard", resizeCx, doneBounds.top - pkv.dpToPx(20), hintPaint);
-            return;
-        }
-
-        // NOTE: pkv.popupRenderer.drawPopupPreview(...) removed from the end of method
         if (needsRedraw) pkv.postInvalidateOnAnimation();
     }
 
-    private void drawEditorIconCenter(Canvas canvas, Drawable icon, RectF bounds, float scale, boolean isEdited) {
+    private void drawFloatingKey(Canvas canvas, KeyData key, float x, float y, float radius, CustomKeyManager ckm) {
+        RectF bounds = new RectF(key.bounds);
+        float dx = x - bounds.centerX();
+        float dy = y - bounds.centerY();
+        bounds.offset(dx, dy);
+        
+        float scale = 1.15f;
+        float cx = bounds.centerX();
+        float cy = bounds.centerY();
+        bounds.left = cx - (bounds.width() / 2f) * scale;
+        bounds.right = cx + (bounds.width() / 2f) * scale;
+        bounds.top = cy - (bounds.height() / 2f) * scale;
+        bounds.bottom = cy + (bounds.height() / 2f) * scale;
+
+        Paint shadow = new Paint(Paint.ANTI_ALIAS_FLAG);
+        shadow.setColor(Color.parseColor("#55000000"));
+        canvas.drawRoundRect(bounds.left+10, bounds.top+15, bounds.right+10, bounds.bottom+15, radius*scale, radius*scale, shadow);
+
+        String physicalLabel = key.label;
+        boolean isSwapped = ckm.isSwapped(physicalLabel);
+        boolean isEdited = false;
+        
+        String customAction = ckm.getActionType(physicalLabel);
+        String customLabel = ckm.getLabel(physicalLabel);
+        String customValue = ckm.getValue(physicalLabel);
+        String[] customLpCheck = ckm.getPopups(physicalLabel);
+        
+        boolean hasPopups = false;
+        if (customLpCheck != null) {
+            for (String p : customLpCheck) {
+                if (p != null && !p.trim().isEmpty()) { hasPopups = true; break; }
+            }
+        }
+
+        if (hasPopups || 
+           (customAction != null && !customAction.equals("DEFAULT") && !customAction.equals("WRITE")) ||
+           (customAction != null && customAction.equals("WRITE") && customValue != null && !customValue.equalsIgnoreCase(customLabel) && customValue.length() > 1)) {
+            isEdited = true;
+        } else if (!isSwapped && customLabel != null && !customLabel.isEmpty() && !customLabel.equalsIgnoreCase(physicalLabel)) {
+            isEdited = true; 
+        }
+
+        boolean hasCustomColor = isSwapped || isEdited;
+        String bgHex = ""; String strokeHex = ""; String textHex = "";
+
+        if (isSwapped && isEdited) {
+            bgHex = "#F3E5F5"; strokeHex = "#9C27B0"; textHex = "#6A1B9A";
+        } else if (isSwapped) {
+            bgHex = "#E3F2FD"; strokeHex = "#2196F3"; textHex = "#1565C0";
+        } else if (isEdited) {
+            bgHex = "#E8F5E9"; strokeHex = "#4CAF50"; textHex = "#2E7D32";
+        }
+
+        if (hasCustomColor) {
+            Paint customBg = new Paint(Paint.ANTI_ALIAS_FLAG);
+            customBg.setColor(Color.parseColor(bgHex)); 
+            canvas.drawRoundRect(bounds, radius*scale, radius*scale, customBg);
+            
+            Paint customStroke = new Paint(Paint.ANTI_ALIAS_FLAG);
+            customStroke.setStyle(Paint.Style.STROKE);
+            customStroke.setStrokeWidth(pkv.dpToPx(2f));
+            customStroke.setColor(Color.parseColor(strokeHex)); 
+            canvas.drawRoundRect(bounds, radius*scale, radius*scale, customStroke);
+        } else {
+            Paint bgPaint = pkv.themeManager.keyBgPaint;
+            if (physicalLabel.equals("ENTER")) bgPaint = pkv.themeManager.enterBgPaint;
+            else if (Arrays.asList("SHIFT", "DEL", "?123", "ABC", "=\\<", "LANG", "EMOJI").contains(physicalLabel)) bgPaint = pkv.themeManager.specialKeyPaint;
+            
+            canvas.drawRoundRect(bounds, radius*scale, radius*scale, bgPaint);
+            if (bgPaint.getAlpha() < 255 && bgPaint.getAlpha() > 0) {
+                canvas.drawRoundRect(bounds, radius*scale, radius*scale, pkv.themeManager.glassBorderPaint);
+            }
+        }
+
+        String displayLabel = pkv.getDisplayLabel(physicalLabel);
+        
+        float initialSize = pkv.dpToPx(displayLabel.length() > 1 ? 14 : 22) * pkv.resizeController.userHeightScale * scale;
+        pkv.themeManager.textPaint.setTextSize(initialSize);
+        
+        if (hasCustomColor) pkv.themeManager.textPaint.setColor(Color.parseColor(textHex));
+        else pkv.themeManager.textPaint.setColor(pkv.themeManager.activeTheme != null ? pkv.themeManager.activeTheme.textColor : Color.BLACK);
+
+        float maxTextWidth = bounds.width() - pkv.dpToPx(12);
+        float currentSize = initialSize;
+        while (pkv.themeManager.textPaint.measureText(displayLabel) > maxTextWidth && currentSize > pkv.dpToPx(6)) {
+            currentSize -= 1f;
+            pkv.themeManager.textPaint.setTextSize(currentSize);
+        }
+
+        canvas.drawText(displayLabel, bounds.centerX(), bounds.centerY() - ((pkv.themeManager.textPaint.descent() + pkv.themeManager.textPaint.ascent()) / 2), pkv.themeManager.textPaint);
+    }
+
+    private void drawEditorIconCenter(Canvas canvas, Drawable icon, RectF bounds, float scale, boolean hasCustomColor, String textHex) {
         if (icon == null) return;
         int iconSize = (int) (pkv.dpToPx(22) * scale); 
         int cxIcon = (int) bounds.centerX(), cyIcon = (int) bounds.centerY() - pkv.dpToPx(1);
         icon.setBounds(cxIcon - (iconSize / 2), cyIcon - (iconSize / 2), cxIcon + (iconSize / 2), cyIcon + (iconSize / 2));
         
-        if (isEdited) {
-            icon.setColorFilter(Color.parseColor("#1B5E20"), android.graphics.PorterDuff.Mode.SRC_IN);
-        }
-        
+        if (hasCustomColor) icon.setColorFilter(Color.parseColor(textHex), android.graphics.PorterDuff.Mode.SRC_IN);
         icon.draw(canvas);
-        
-        if (isEdited) {
-            icon.clearColorFilter();
-        }
+        if (hasCustomColor) icon.clearColorFilter();
     }
 }

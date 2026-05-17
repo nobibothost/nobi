@@ -18,6 +18,8 @@ import android.view.inputmethod.ExtractedText;
 import android.view.inputmethod.ExtractedTextRequest;
 import android.view.inputmethod.InputConnection;
 import android.view.inputmethod.InputMethodManager;
+import android.widget.Toast;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -363,7 +365,48 @@ public class GboardService extends InputMethodService {
                 InputConnection ic = getCurrentInputConnection();
                 if (ic == null) return;
 
-                // --- CUSTOM KEYCAFE ADVANCED LOGIC WITH NORMALIZATION ---
+                // =====================================================================
+                // --- NEW UNIFIED GLOBAL COMMAND INTERCEPTOR (100% TYPING PREVENTION) ---
+                // =====================================================================
+                if (rawKey.startsWith("CMD_")) {
+                    if (rawKey.equals("CMD_OPEN_LAYOUTS")) {
+                        if (keyboardView != null && keyboardView.layoutProfileSheet != null) {
+                            keyboardView.layoutProfileSheet.show();
+                        }
+                    } else if (rawKey.equals("CMD_OPEN_SETTINGS")) {
+                        try {
+                            Intent intent = new Intent(GboardService.this, MainActivity.class);
+                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                            startActivity(intent);
+                            requestHideSelf(0);
+                        } catch (Exception e) { e.printStackTrace(); }
+                    } else if (rawKey.equals("CMD_VOICE_INPUT")) {
+                        try {
+                            Intent intent = new Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+                            intent.putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                            startActivity(intent);
+                        } catch (Exception e) {
+                            Toast.makeText(GboardService.this, "Voice Input not supported or permission denied.", Toast.LENGTH_SHORT).show();
+                        }
+                    } else if (rawKey.equals("CMD_MOVE_LEFT")) { sendCursorCommand(ic, KeyEvent.KEYCODE_DPAD_LEFT); }
+                    else if (rawKey.equals("CMD_MOVE_RIGHT")) { sendCursorCommand(ic, KeyEvent.KEYCODE_DPAD_RIGHT); }
+                    else if (rawKey.equals("CMD_MOVE_UP")) { sendCursorCommand(ic, KeyEvent.KEYCODE_DPAD_UP); }
+                    else if (rawKey.equals("CMD_MOVE_DOWN")) { sendCursorCommand(ic, KeyEvent.KEYCODE_DPAD_DOWN); }
+                    else if (rawKey.equals("CMD_MOVE_HOME")) { jumpCursor(ic, true); }
+                    else if (rawKey.equals("CMD_MOVE_END")) { jumpCursor(ic, false); }
+                    else if (rawKey.equals("CMD_SELECT_TOGGLE")) { isSelectModeOn = !isSelectModeOn; }
+                    else if (rawKey.equals("CMD_SELECT_RESET")) { isSelectModeOn = false; }
+                    else if (rawKey.equals("CMD_SELECT_ALL")) { ic.performContextMenuAction(android.R.id.selectAll); }
+                    else if (rawKey.equals("CMD_COPY")) { ic.performContextMenuAction(android.R.id.copy); isSelectModeOn = false; }
+                    else if (rawKey.equals("CMD_PASTE")) { ic.performContextMenuAction(android.R.id.paste); }
+                    else if (rawKey.equals("CMD_CUT")) { ic.performContextMenuAction(android.R.id.cut); isSelectModeOn = false; }
+                    
+                    return; // CRITICAL: Stop execution here so it DOES NOT type out the text!
+                }
+                // =====================================================================
+
+
                 CustomKeyManager ckm = CustomKeyManager.getInstance(GboardService.this);
                 String actionType = ckm.getActionType(rawKey);
                 String customValue = ckm.getValue(rawKey);
@@ -371,7 +414,21 @@ public class GboardService extends InputMethodService {
                 if (actionType != null && !actionType.equals("DEFAULT")) {
                     switch (actionType) {
                         case "WRITE":
-                            if (customValue != null && !customValue.isEmpty()) ic.commitText(customValue, 1);
+                            if (customValue != null && !customValue.isEmpty()) {
+                                String textToCommit = customValue;
+                                if (textToCommit.length() == 1 && Character.isLetter(textToCommit.charAt(0)) && keyboardView.currentMode == ProKeyboardView.MODE_TEXT) {
+                                    if (keyboardView.isCapsLockOn()) {
+                                        textToCommit = textToCommit.toUpperCase();
+                                    } else if (isAutoShifted || keyboardView.isShifted) {
+                                        textToCommit = textToCommit.toUpperCase();
+                                        isAutoShifted = false;
+                                        keyboardView.setShifted(false);
+                                    } else {
+                                        textToCommit = textToCommit.toLowerCase();
+                                    }
+                                }
+                                ic.commitText(textToCommit, 1);
+                            }
                             break;
                         case "DELETE":
                         case "BACKSPACE":
@@ -523,29 +580,6 @@ public class GboardService extends InputMethodService {
                     }
                     return;
                 }
-
-                if (rawKey.equals("CMD_OPEN_SETTINGS")) {
-                    try {
-                        Intent intent = new Intent(GboardService.this, MainActivity.class);
-                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                        startActivity(intent);
-                        requestHideSelf(0);
-                    } catch (Exception e) { e.printStackTrace(); }
-                    return;
-                }
-
-                if (rawKey.equals("CMD_MOVE_LEFT")) { sendCursorCommand(ic, KeyEvent.KEYCODE_DPAD_LEFT); return; }
-                if (rawKey.equals("CMD_MOVE_RIGHT")) { sendCursorCommand(ic, KeyEvent.KEYCODE_DPAD_RIGHT); return; }
-                if (rawKey.equals("CMD_MOVE_UP")) { sendCursorCommand(ic, KeyEvent.KEYCODE_DPAD_UP); return; }
-                if (rawKey.equals("CMD_MOVE_DOWN")) { sendCursorCommand(ic, KeyEvent.KEYCODE_DPAD_DOWN); return; }
-                if (rawKey.equals("CMD_MOVE_HOME")) { jumpCursor(ic, true); return; }
-                if (rawKey.equals("CMD_MOVE_END")) { jumpCursor(ic, false); return; }
-                if (rawKey.equals("CMD_SELECT_TOGGLE")) { isSelectModeOn = !isSelectModeOn; return; }
-                if (rawKey.equals("CMD_SELECT_RESET")) { isSelectModeOn = false; return; }
-                if (rawKey.equals("CMD_SELECT_ALL")) { ic.performContextMenuAction(android.R.id.selectAll); return; }
-                if (rawKey.equals("CMD_COPY")) { ic.performContextMenuAction(android.R.id.copy); isSelectModeOn = false; return; }
-                if (rawKey.equals("CMD_PASTE")) { ic.performContextMenuAction(android.R.id.paste); return; }
-                if (rawKey.equals("CMD_CUT")) { ic.performContextMenuAction(android.R.id.cut); isSelectModeOn = false; return; }
 
                 if (rawKey.startsWith("SUG:")) {
                     String suggestion = rawKey.substring(4);

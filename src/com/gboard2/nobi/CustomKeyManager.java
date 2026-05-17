@@ -18,9 +18,13 @@ public class CustomKeyManager {
     private JSONObject customKeys;
     private String activeProfile = "Default";
 
+    // --- UNDO / REDO STATE VARIABLES ---
+    private List<String> historyStack = new ArrayList<>();
+    private int historyIndex = -1;
+    private int savedHistoryIndex = -1; 
+
     private CustomKeyManager(Context context) {
         prefs = context.getSharedPreferences("KeyCafeConfig", Context.MODE_PRIVATE);
-        // सक्रिय प्रोफ़ाइल को डेटाबेस से लोड करें
         activeProfile = prefs.getString("active_layout_profile", "Default");
         loadConfig();
     }
@@ -32,68 +36,136 @@ public class CustomKeyManager {
         return instance;
     }
 
-    // --- मल्टी-प्रोफ़ाइल लॉजिक ---
-
-    // सक्रिय प्रोफ़ाइल का नाम प्राप्त करें
     public String getActiveProfile() {
         return activeProfile;
     }
 
-    // सक्रिय प्रोफ़ाइल सेट करें और उसे डेटाबेस में सेव करें
     public void setActiveProfile(String profileName) {
         this.activeProfile = profileName;
         prefs.edit().putString("active_layout_profile", profileName).apply();
-        loadConfig(); // सक्रिय प्रोफ़ाइल बदलने पर कॉन्फ़िगरेशन को फिर से लोड करें
+        loadConfig(); 
     }
 
-    // सेव किए गए प्रोफ़ाइल की सूची प्राप्त करें
     public List<String> getSavedProfiles() {
         Set<String> profiles = prefs.getStringSet("saved_profiles", new HashSet<String>());
         List<String> list = new ArrayList<>();
-        list.add("Default"); // 'डिफ़ॉल्ट' को हमेशा पहले स्थान पर रखें
+        list.add("Default"); 
         for (String p : profiles) {
             if (!p.equals("Default")) list.add(p);
         }
         return list;
     }
 
-    // नया प्रोफ़ाइल बनाएँ
     public void createNewProfile(String profileName) {
         if (profileName == null || profileName.trim().isEmpty() || profileName.equalsIgnoreCase("Default")) return;
         
         Set<String> profiles = new HashSet<>(prefs.getStringSet("saved_profiles", new HashSet<String>()));
         profiles.add(profileName);
         prefs.edit().putStringSet("saved_profiles", profiles).apply();
-        setActiveProfile(profileName); // नया प्रोफ़ाइल बनाने के बाद उसे सक्रिय करें
+        setActiveProfile(profileName); 
     }
 
-    // प्रोफ़ाइल के लिए डेटाबेस की' प्राप्त करें
+    // --- NEW: RENAME & DELETE PROFILE LOGIC ---
+    
+    public boolean deleteProfile(String profileName) {
+        if (profileName == null || profileName.equals("Default")) return false; // Block deleting Default
+        
+        Set<String> profiles = new HashSet<>(prefs.getStringSet("saved_profiles", new HashSet<String>()));
+        if (profiles.contains(profileName)) {
+            profiles.remove(profileName);
+            prefs.edit().putStringSet("saved_profiles", profiles).apply();
+            prefs.edit().remove("custom_keys_" + profileName).apply(); // Delete associated layout data
+            
+            if (activeProfile.equals(profileName)) {
+                setActiveProfile("Default"); // Fallback to Default if active profile is deleted
+            }
+            return true;
+        }
+        return false;
+    }
+
+    public boolean renameProfile(String oldName, String newName) {
+        if (oldName == null || oldName.equals("Default") || newName == null || newName.trim().isEmpty() || newName.equalsIgnoreCase("Default")) return false;
+        
+        Set<String> profiles = new HashSet<>(prefs.getStringSet("saved_profiles", new HashSet<String>()));
+        if (profiles.contains(oldName) && !profiles.contains(newName)) { // Ensure new name doesn't overwrite an existing one
+            profiles.remove(oldName);
+            profiles.add(newName);
+            prefs.edit().putStringSet("saved_profiles", profiles).apply();
+            
+            // Transfer JSON Data to new Profile Name
+            String oldData = prefs.getString("custom_keys_" + oldName, "{}");
+            prefs.edit().putString("custom_keys_" + newName, oldData).apply();
+            prefs.edit().remove("custom_keys_" + oldName).apply(); // Delete old data
+            
+            if (activeProfile.equals(oldName)) {
+                setActiveProfile(newName); // Keep user on the renamed profile
+            }
+            return true;
+        }
+        return false;
+    }
+
+    // --- END RENAME & DELETE LOGIC ---
+
     private String getProfileStorageKey() {
         return "custom_keys_" + activeProfile;
     }
 
-    // --- एंड मल्टी-प्रोफ़ाइल लॉजिक ---
-
-    // सक्रिय प्रोफ़ाइल के लिए कॉन्फ़िगरेशन लोड करें
     public void loadConfig() {
         if (activeProfile.equals("Default")) {
-            customKeys = new JSONObject(); // 'डिफ़ॉल्ट' प्रोफ़ाइल हमेशा खाली रहती है
-            return;
+            customKeys = new JSONObject(); 
+        } else {
+            String jsonStr = prefs.getString(getProfileStorageKey(), "{}");
+            try {
+                customKeys = new JSONObject(jsonStr);
+            } catch (JSONException e) {
+                customKeys = new JSONObject();
+            }
         }
         
-        String jsonStr = prefs.getString(getProfileStorageKey(), "{}");
-        try {
-            customKeys = new JSONObject(jsonStr);
-        } catch (JSONException e) {
-            customKeys = new JSONObject();
+        historyStack.clear();
+        historyStack.add(customKeys.toString());
+        historyIndex = 0;
+        savedHistoryIndex = 0;
+    }
+
+    public void saveToHistory() {
+        if (activeProfile.equals("Default")) return;
+        
+        while (historyStack.size() > historyIndex + 1) {
+            historyStack.remove(historyStack.size() - 1);
+        }
+        
+        historyStack.add(customKeys.toString());
+        historyIndex++;
+    }
+
+    public void commitChanges() {
+        if (activeProfile.equals("Default")) return;
+        prefs.edit().putString(getProfileStorageKey(), customKeys.toString()).apply();
+        savedHistoryIndex = historyIndex; 
+    }
+
+    public void undo() {
+        if (canUndo()) {
+            historyIndex--;
+            try { customKeys = new JSONObject(historyStack.get(historyIndex)); } 
+            catch (JSONException e) { e.printStackTrace(); }
         }
     }
 
-    // सक्रिय प्रोफ़ाइल के लिए कॉन्फ़िगरेशन सेव करें
-    private void saveConfig() {
-        if (activeProfile.equals("Default")) return; // 'डिफ़ॉल्ट' में बदलाव को रोकें
-        prefs.edit().putString(getProfileStorageKey(), customKeys.toString()).apply();
+    public void redo() {
+        if (canRedo()) {
+            historyIndex++;
+            try { customKeys = new JSONObject(historyStack.get(historyIndex)); } 
+            catch (JSONException e) { e.printStackTrace(); }
+        }
     }
+
+    public boolean canUndo() { return historyIndex > 0; }
+    public boolean canRedo() { return historyIndex < historyStack.size() - 1; }
+    public boolean hasUnsavedChanges() { return historyIndex != savedHistoryIndex; }
 
     private String getNormalizedId(String keyId) {
         if (keyId != null && keyId.length() == 1) {
@@ -105,13 +177,14 @@ public class CustomKeyManager {
         return keyId;
     }
 
-    // कस्टमाइज्ड की' डेटा सेट करें
     public void setCustomMapping(String rawKeyId, String label, String actionType, String actionValue, String[] popups) {
-        if (activeProfile.equals("Default")) return; // 'डिफ़ॉल्ट' प्रोफ़ाइल में एडिट ब्लॉक करें
+        if (activeProfile.equals("Default")) return; 
 
         try {
             String keyId = getNormalizedId(rawKeyId);
-            JSONObject keyData = new JSONObject();
+            JSONObject keyData = getKeyData(rawKeyId);
+            if (keyData == null) keyData = new JSONObject();
+            
             keyData.put("label", label);
             keyData.put("actionType", actionType);
             keyData.put("actionValue", actionValue);
@@ -123,20 +196,17 @@ public class CustomKeyManager {
             keyData.put("popups", popupsArray);
 
             customKeys.put(keyId, keyData);
-            saveConfig(); // सेव करने के लिए कॉन्फ़िगरेशन को फिर से लोड करें
         } catch (JSONException e) {
             e.printStackTrace();
         }
     }
 
-    // की' कस्टमाइजेशन को रीसेट करें
     public void resetKey(String rawKeyId) {
         if (activeProfile.equals("Default")) return;
 
         String keyId = getNormalizedId(rawKeyId);
         if (customKeys.has(keyId)) {
             customKeys.remove(keyId);
-            saveConfig(); // सेव करने के लिए कॉन्फ़िगरेशन को फिर से लोड करें
         }
     }
 
@@ -145,13 +215,26 @@ public class CustomKeyManager {
 
         String keyId = getNormalizedId(rawKeyId);
         if (customKeys.has(keyId)) {
-            try {
-                return customKeys.getJSONObject(keyId);
-            } catch (JSONException e) {
-                return null;
-            }
+            try { return customKeys.getJSONObject(keyId); } 
+            catch (JSONException e) { return null; }
         }
         return null;
+    }
+
+    public boolean isSwapped(String rawKeyId) {
+        JSONObject data = getKeyData(rawKeyId);
+        return data != null && data.optBoolean("isSwapped", false);
+    }
+
+    public void setSwapped(String rawKeyId, boolean swapped) {
+        if (activeProfile.equals("Default")) return;
+        try {
+            String keyId = getNormalizedId(rawKeyId);
+            JSONObject keyData = getKeyData(rawKeyId);
+            if (keyData == null) keyData = new JSONObject();
+            keyData.put("isSwapped", swapped);
+            customKeys.put(keyId, keyData);
+        } catch (JSONException e) { e.printStackTrace(); }
     }
 
     public String getLabel(String keyId) {
@@ -179,9 +262,7 @@ public class CustomKeyManager {
                     popups[i] = array.optString(i, "");
                 }
                 return popups;
-            } catch (JSONException e) {
-                return null;
-            }
+            } catch (JSONException e) { return null; }
         }
         return null;
     }

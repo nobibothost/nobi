@@ -14,7 +14,6 @@ public class PopupRenderer {
     }
 
     public void drawPopupPreview(Canvas canvas, KeyData key) {
-        // FIXED: Removed strict currentMode checking. Now it directly verifies if the label exists in dictionaries.
         boolean isEmojiSwipe = pkv.touchHandler.isLongPressTriggered && pkv.swipeEmojiManager.swipeEmojis.containsKey(key.label);
         boolean isSymbolSwipe = pkv.touchHandler.isLongPressTriggered && pkv.swipeSymbolManager.swipeSymbols.containsKey(key.label);
         boolean isSwipePopup = isEmojiSwipe || isSymbolSwipe;
@@ -41,8 +40,8 @@ public class PopupRenderer {
         
         pkv.themeManager.popupTextPaint.setColor(pkv.themeManager.activeTheme != null ? pkv.themeManager.activeTheme.textColor : Color.parseColor("#263238"));
 
-        boolean isEmojiKey = Arrays.asList(ProKeyboardView.TOP_ROW_EMOJIS).contains(key.label);
-        boolean isSlangKey = Arrays.asList(ProKeyboardView.TOP_ROW_SLANG).contains(key.label);
+        boolean isEmojiKey = Arrays.asList(KeyboardData.TOP_ROW_EMOJIS).contains(key.label);
+        boolean isSlangKey = Arrays.asList(KeyboardData.TOP_ROW_SLANG).contains(key.label);
         
         if (isSwipePopup) {
             String[] items = isEmojiSwipe ? pkv.swipeEmojiManager.swipeEmojis.get(key.label) : pkv.swipeSymbolManager.swipeSymbols.get(key.label);
@@ -61,8 +60,17 @@ public class PopupRenderer {
             pkv.themeManager.popupTextPaint.setTypeface(android.graphics.Typeface.DEFAULT);
 
             for (int i = 0; i < 5; i++) {
-                float textSize = (i == pkv.touchHandler.currentSwipeDirection) ? pkv.dpToPx(28) : pkv.dpToPx(16);
-                pkv.themeManager.popupTextPaint.setTextSize(textSize * pkv.resizeController.userHeightScale);
+                float initialTextSize = (i == pkv.touchHandler.currentSwipeDirection) ? pkv.dpToPx(28) : pkv.dpToPx(16);
+                initialTextSize *= pkv.resizeController.userHeightScale;
+                pkv.themeManager.popupTextPaint.setTextSize(initialTextSize);
+                
+                // --- Math-Scale Auto-Fit for Swipe Options ---
+                float maxOptionWidth = (spacing * 1.8f);
+                float textWidth = pkv.themeManager.popupTextPaint.measureText(items[i]);
+                if (textWidth > maxOptionWidth && textWidth > 0) {
+                    pkv.themeManager.popupTextPaint.setTextSize(initialTextSize * (maxOptionWidth / textWidth));
+                }
+
                 pkv.themeManager.popupTextPaint.setAlpha((i == pkv.touchHandler.currentSwipeDirection) ? 255 : 100);
                 canvas.drawText(items[i], coords[i][0], coords[i][1] - ((pkv.themeManager.popupTextPaint.descent() + pkv.themeManager.popupTextPaint.ascent()) / 2), pkv.themeManager.popupTextPaint);
             }
@@ -73,26 +81,28 @@ public class PopupRenderer {
             pkv.themeManager.popupTextPaint.setTextSize(pkv.dpToPx(32) * pkv.resizeController.userHeightScale);
             canvas.drawText(key.label, popupBounds.centerX(), popupBounds.centerY() - ((pkv.themeManager.popupTextPaint.descent() + pkv.themeManager.popupTextPaint.ascent()) / 2), pkv.themeManager.popupTextPaint);
 
-        } else if (isSlangKey) {
-            pkv.themeManager.popupTextPaint.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
-            float maxTextWidth = popupBounds.width() - pkv.dpToPx(8);
-            float textSize = pkv.dpToPx(16) * pkv.resizeController.userHeightScale; 
-            pkv.themeManager.popupTextPaint.setTextSize(textSize);
-
-            while (pkv.themeManager.popupTextPaint.measureText(pkv.getDisplayLabel(key.label)) > maxTextWidth && textSize > pkv.dpToPx(8)) {
-                textSize -= pkv.dpToPx(0.5f);
-                pkv.themeManager.popupTextPaint.setTextSize(textSize);
-            }
-            canvas.drawText(pkv.getDisplayLabel(key.label), popupBounds.centerX(), popupBounds.centerY() - ((pkv.themeManager.popupTextPaint.descent() + pkv.themeManager.popupTextPaint.ascent()) / 2), pkv.themeManager.popupTextPaint);
-
         } else {
-            pkv.themeManager.popupTextPaint.setTextSize(pkv.dpToPx(28) * pkv.resizeController.userHeightScale);
-            if (pkv.themeManager.activeFont != null && !pkv.themeManager.activeFont.name.equals("Default")) {
+            // --- Math-Scale Auto-Fit for Standard Popups ---
+            String displayLabel = pkv.getDisplayLabel(key.label);
+            float initialSize = pkv.dpToPx(isSlangKey ? 16 : 28) * pkv.resizeController.userHeightScale;
+            pkv.themeManager.popupTextPaint.setTextSize(initialSize);
+
+            if (isSlangKey) {
+                pkv.themeManager.popupTextPaint.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+            } else if (pkv.themeManager.activeFont != null && !pkv.themeManager.activeFont.name.equals("Default")) {
                 pkv.themeManager.popupTextPaint.setTypeface(pkv.themeManager.activeFont.keyboardTypeface);
             } else {
                 pkv.themeManager.popupTextPaint.setTypeface(android.graphics.Typeface.DEFAULT);
             }
-            canvas.drawText(pkv.getDisplayLabel(key.label), popupBounds.centerX(), popupBounds.centerY() - ((pkv.themeManager.popupTextPaint.descent() + pkv.themeManager.popupTextPaint.ascent()) / 2), pkv.themeManager.popupTextPaint);
+
+            float maxTextWidth = popupBounds.width() - pkv.dpToPx(8);
+            float textWidth = pkv.themeManager.popupTextPaint.measureText(displayLabel);
+            
+            if (textWidth > maxTextWidth && textWidth > 0) {
+                pkv.themeManager.popupTextPaint.setTextSize(initialSize * (maxTextWidth / textWidth));
+            }
+
+            canvas.drawText(displayLabel, popupBounds.centerX(), popupBounds.centerY() - ((pkv.themeManager.popupTextPaint.descent() + pkv.themeManager.popupTextPaint.ascent()) / 2), pkv.themeManager.popupTextPaint);
         }
     }
 }

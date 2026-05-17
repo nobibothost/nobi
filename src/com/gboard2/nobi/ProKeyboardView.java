@@ -2,14 +2,11 @@ package com.gboard2.nobi;
 
 import android.content.Context;
 import android.graphics.Canvas;
-import android.graphics.Color;
-import android.graphics.Paint;
 import android.text.InputType;
 import android.util.DisplayMetrics;
 import android.view.MotionEvent;
 import android.view.inputmethod.EditorInfo;
 import android.widget.FrameLayout;
-
 import java.util.ArrayList;
 import java.util.List;
 
@@ -19,9 +16,6 @@ public class ProKeyboardView extends FrameLayout {
     public static final int MODE_SYMBOLS = 1;
     public static final int MODE_SYMBOLS_PAGE_2 = 2;
     public static final int MODE_NUMBER = 4;
-
-    public static final String[] TOP_ROW_SLANG = {"AWESOME", "HAHHAAHHA", "LMAO", "ACHA", "JI", "ESA KYA", "HAA", "YRR", "HMMMM HMMMM", "OHK", "LOVE YOU"};
-    public static final String[] TOP_ROW_EMOJIS = {"😢", "🤤", "😒", "😁", "🤭", "😊", "🔥", "🤣", "😂", "🙂"};
 
     public ThemeManager themeManager;
     public SuggestionManager suggestionManager;
@@ -41,6 +35,7 @@ public class ProKeyboardView extends FrameLayout {
     public EmojiSheet emojiSheet;
     public ThemeSheet themeSheet;
     public FontSheet fontSheet;
+    public LayoutProfileSheet layoutProfileSheet;
     public KeyboardListener listener;
 
     public List<KeyData> keys = new ArrayList<>();
@@ -66,7 +61,7 @@ public class ProKeyboardView extends FrameLayout {
         toolbarManager = new ToolbarManager(context, this);
         layoutManager = new KeyboardLayoutManager(this);
         popupRenderer = new PopupRenderer(this);
-        renderer = new KeyboardRenderer(this); // Standard renderer for typing
+        renderer = new KeyboardRenderer(this); 
         touchHandler = new KeyboardTouchHandler(this);
         
         soundManager = new SoundManager(context);
@@ -82,12 +77,14 @@ public class ProKeyboardView extends FrameLayout {
         if (emojiSheet != null) removeView(emojiSheet);
         if (themeSheet != null) removeView(themeSheet);
         if (fontSheet != null) removeView(fontSheet);
+        if (layoutProfileSheet != null) removeView(layoutProfileSheet); 
         
         clipboardBottomSheet = new ClipboardBottomSheet(getContext(), this.listener);
         textEditingSheet = new TextEditingSheet(getContext(), this.listener);
         emojiSheet = new EmojiSheet(getContext(), this.listener);
         themeSheet = new ThemeSheet(getContext(), this);
         fontSheet = new FontSheet(getContext(), this);
+        layoutProfileSheet = new LayoutProfileSheet(getContext(), this); 
         
         if (themeManager.activeTheme != null) {
             clipboardBottomSheet.applyTheme(themeManager.activeTheme);
@@ -95,6 +92,7 @@ public class ProKeyboardView extends FrameLayout {
             emojiSheet.applyTheme(themeManager.activeTheme);
             themeSheet.applyTheme(themeManager.activeTheme);
             fontSheet.applyTheme(themeManager.activeTheme);
+            layoutProfileSheet.applyTheme(themeManager.activeTheme);
         }
         
         addView(clipboardBottomSheet, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
@@ -102,19 +100,19 @@ public class ProKeyboardView extends FrameLayout {
         addView(emojiSheet, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
         addView(themeSheet, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
         addView(fontSheet, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
+        addView(layoutProfileSheet, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
     }
     
     public void applyTheme(ThemeData.Theme theme) {
         themeManager.applyTheme(theme);
+        if(layoutProfileSheet != null) layoutProfileSheet.applyTheme(theme);
     }
 
     public void applyFont(FontData.FontStyle font) {
         themeManager.applyFont(font);
     }
 
-    public boolean isCapsLockOn() {
-        return isCapsLock;
-    }
+    public boolean isCapsLockOn() { return isCapsLock; }
 
     public void setShifted(boolean shifted) {
         if (isCapsLock) return;
@@ -136,6 +134,7 @@ public class ProKeyboardView extends FrameLayout {
         if (emojiSheet != null && emojiSheet.isShowing()) emojiSheet.hide();
         if (themeSheet != null && themeSheet.isShowing()) themeSheet.hide();
         if (fontSheet != null && fontSheet.isShowing()) fontSheet.hide();
+        if (layoutProfileSheet != null && layoutProfileSheet.isShowing()) layoutProfileSheet.hide(); 
         
         if (!isCapsLock) isShifted = false;
         
@@ -206,28 +205,54 @@ public class ProKeyboardView extends FrameLayout {
 
         CustomKeyManager ckm = CustomKeyManager.getInstance(getContext());
         
-        // BUG FIX: Removed the buggy hint drawing loop from here. Now handled securely by the Renderers!
-
         if (touchHandler != null && touchHandler.activeKey != null && touchHandler.isLongPressTriggered && !resizeController.isResizing) {
-            boolean isEmojiLongPress = java.util.Arrays.asList(TOP_ROW_EMOJIS).contains(touchHandler.activeKey.label);
-            String[] customPopups = ckm.getPopups(touchHandler.activeKey.label);
+            
+            String physicalLabel = touchHandler.activeKey.label;
+            String effLabel = ckm.getLabel(physicalLabel);
+            if (effLabel == null || effLabel.isEmpty()) effLabel = physicalLabel;
+
+            String[] customPopups = ckm.getPopups(physicalLabel);
+            boolean hasExplicitPopups = false;
             
             if (customPopups != null) {
-                if (swipeSymbolManager != null) {
-                    String center = (customPopups[0] != null && !customPopups[0].isEmpty()) ? customPopups[0] : touchHandler.activeKey.label;
-                    String up = (customPopups[1] != null && !customPopups[1].isEmpty()) ? customPopups[1] : center;
-                    String down = (customPopups[2] != null && !customPopups[2].isEmpty()) ? customPopups[2] : center;
-                    String left = (customPopups[3] != null && !customPopups[3].isEmpty()) ? customPopups[3] : center;
-                    String right = (customPopups[4] != null && !customPopups[4].isEmpty()) ? customPopups[4] : center;
-
-                    swipeSymbolManager.swipeSymbols.put(touchHandler.activeKey.label, new String[]{center, up, down, left, right});
-                    popupRenderer.drawPopupPreview(canvas, touchHandler.activeKey);
-                }
-            } else if (currentMode == MODE_SYMBOLS || currentMode == MODE_SYMBOLS_PAGE_2 || isEmojiLongPress) {
-                if (swipeSymbolManager != null && swipeSymbolManager.swipeSymbols.containsKey(touchHandler.activeKey.label)) {
-                    popupRenderer.drawPopupPreview(canvas, touchHandler.activeKey);
+                for (String p : customPopups) {
+                    if (p != null && !p.trim().isEmpty()) { hasExplicitPopups = true; break; }
                 }
             }
+
+            if (hasExplicitPopups) {
+                String center = (customPopups[0] != null && !customPopups[0].isEmpty()) ? customPopups[0] : effLabel;
+                String up = (customPopups[1] != null && !customPopups[1].isEmpty()) ? customPopups[1] : center;
+                String down = (customPopups[2] != null && !customPopups[2].isEmpty()) ? customPopups[2] : center;
+                String left = (customPopups[3] != null && !customPopups[3].isEmpty()) ? customPopups[3] : center;
+                String right = (customPopups[4] != null && !customPopups[4].isEmpty()) ? customPopups[4] : center;
+
+                if (swipeSymbolManager != null) swipeSymbolManager.swipeSymbols.put(physicalLabel, new String[]{center, up, down, left, right});
+                if (swipeEmojiManager != null) swipeEmojiManager.swipeEmojis.put(physicalLabel, new String[]{center, up, down, left, right});
+            } else {
+                String[] defaultPopups = KeyboardLayouts.getPopups(effLabel);
+                if (defaultPopups != null) {
+                    String center = (defaultPopups.length > 0 && defaultPopups[0] != null) ? defaultPopups[0] : effLabel;
+                    String up = (defaultPopups.length > 1 && defaultPopups[1] != null) ? defaultPopups[1] : center;
+                    String down = (defaultPopups.length > 2 && defaultPopups[2] != null) ? defaultPopups[2] : center;
+                    String left = (defaultPopups.length > 3 && defaultPopups[3] != null) ? defaultPopups[3] : center;
+                    String right = (defaultPopups.length > 4 && defaultPopups[4] != null) ? defaultPopups[4] : center;
+                    
+                    if (swipeSymbolManager != null) swipeSymbolManager.swipeSymbols.put(physicalLabel, new String[]{center, up, down, left, right});
+                    if (swipeEmojiManager != null) swipeEmojiManager.swipeEmojis.put(physicalLabel, new String[]{center, up, down, left, right});
+                } else if (KeyboardData.SWIPE_EMOJIS.containsKey(effLabel)) {
+                    String[] defaultEmojis = KeyboardData.SWIPE_EMOJIS.get(effLabel);
+                    String center = (defaultEmojis.length > 0 && defaultEmojis[0] != null) ? defaultEmojis[0] : effLabel;
+                    String up = (defaultEmojis.length > 1 && defaultEmojis[1] != null) ? defaultEmojis[1] : center;
+                    String down = (defaultEmojis.length > 2 && defaultEmojis[2] != null) ? defaultEmojis[2] : center;
+                    String left = (defaultEmojis.length > 3 && defaultEmojis[3] != null) ? defaultEmojis[3] : center;
+                    String right = (defaultEmojis.length > 4 && defaultEmojis[4] != null) ? defaultEmojis[4] : center;
+                    
+                    if (swipeSymbolManager != null) swipeSymbolManager.swipeSymbols.put(physicalLabel, new String[]{center, up, down, left, right});
+                    if (swipeEmojiManager != null) swipeEmojiManager.swipeEmojis.put(physicalLabel, new String[]{center, up, down, left, right});
+                }
+            }
+            popupRenderer.drawPopupPreview(canvas, touchHandler.activeKey);
         }
     }
 
@@ -256,12 +281,13 @@ public class ProKeyboardView extends FrameLayout {
     }
 
     public String getDisplayLabel(String rawLabel) {
-        if (rawLabel.equals("HMMMM HMMMM")) return "HMM";
-        if (rawLabel.equals("HAHHAAHHA")) return "HAHA";
-        
         CustomKeyManager ckm = CustomKeyManager.getInstance(getContext());
         String customLabel = ckm.getLabel(rawLabel);
+        
         if (customLabel != null && !customLabel.isEmpty()) {
+            if (customLabel.length() == 1 && Character.isLetter(customLabel.charAt(0)) && currentMode == MODE_TEXT) {
+                return (isShifted || isCapsLock) ? customLabel.toUpperCase() : customLabel.toLowerCase();
+            }
             return customLabel;
         }
         

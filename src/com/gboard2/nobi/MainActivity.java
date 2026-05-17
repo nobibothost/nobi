@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -50,18 +51,14 @@ public class MainActivity extends Activity {
         FrameLayout rootFrame = new FrameLayout(this);
         rootFrame.setBackgroundColor(Color.parseColor(UIHelpers.COLOR_BG));
         
-        // --- MAIN CONTENT (Tabs Container without the old Header) ---
         LinearLayout mainContent = new LinearLayout(this);
         mainContent.setOrientation(LinearLayout.VERTICAL);
         
-        // --- CONTENT CONTAINER ---
         contentContainer = new FrameLayout(this);
         LinearLayout.LayoutParams contentParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f);
-        // Added small top margin to prevent overlapping with status bar since the header is gone
         contentParams.topMargin = UIHelpers.dpToPx(this, 12); 
         mainContent.addView(contentContainer, contentParams);
 
-        // Initialize Tabs
         tabHome = new HomeTab(this, prefs, new Runnable() {
             @Override
             public void run() {
@@ -79,7 +76,7 @@ public class MainActivity extends Activity {
 
         rootFrame.addView(mainContent, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
-        // --- FLOATING TEST KEYBOARD ICON (Top Right Corner) ---
+        // --- FLOATING TEST KEYBOARD ICON ---
         LinearLayout testIconContainer = new LinearLayout(this);
         testIconContainer.setGravity(Gravity.CENTER);
         
@@ -132,7 +129,6 @@ public class MainActivity extends Activity {
             }
         });
 
-        // Add as a floating element on top of everything
         FrameLayout.LayoutParams testIconParams = new FrameLayout.LayoutParams(UIHelpers.dpToPx(this, 44), UIHelpers.dpToPx(this, 44));
         testIconParams.gravity = Gravity.TOP | Gravity.END;
         testIconParams.setMargins(0, UIHelpers.dpToPx(this, 16), UIHelpers.dpToPx(this, 16), 0);
@@ -170,6 +166,17 @@ public class MainActivity extends Activity {
 
         setContentView(rootFrame);
         switchTab(0);
+    }
+
+    // --- NEW FIX: HANDLE FILE PICKER RESULT FOR IMPORT ---
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == 1001 && resultCode == RESULT_OK && data != null) {
+            if (tabCustomize != null) {
+                tabCustomize.handleImportUri(data.getData());
+            }
+        }
     }
 
     private void showTestKeyboardDialog() {
