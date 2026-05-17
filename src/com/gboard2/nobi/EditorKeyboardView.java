@@ -77,7 +77,8 @@ public class EditorKeyboardView extends ProKeyboardView {
                     @Override
                     public void run() {
                         manager.saveToHistory(); 
-                        refreshLayout(); 
+                        // Fix 1: Add proper scope resolution for inner class
+                        EditorKeyboardView.this.refreshLayout(); 
                         postInvalidateOnAnimation();
                         if (onStateChangedCallback != null) onStateChangedCallback.run(); 
                     }
@@ -85,6 +86,15 @@ public class EditorKeyboardView extends ProKeyboardView {
                 sheet.show();
             }
         });
+    }
+
+    // Fix 2: Implement missing refreshLayout method
+    private void refreshLayout() {
+        if (layoutManager != null) {
+            layoutManager.buildKeys();
+        }
+        requestLayout();
+        invalidate();
     }
 
     private KeyData findKey(float x, float y) {

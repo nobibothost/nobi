@@ -42,10 +42,12 @@ public class GboardService extends InputMethodService {
     private String previousLearnedWord = "";
     private String potentialMistake = ""; 
     
+    private static final java.util.regex.Pattern DIACRITICS_PATTERN = java.util.regex.Pattern.compile("\\p{M}");
+    
     private String normalizeFontText(String text) {
         if (text == null) return "";
         String normalized = java.text.Normalizer.normalize(text, java.text.Normalizer.Form.NFKD);
-        normalized = normalized.replaceAll("\\p{M}", ""); 
+        normalized = DIACRITICS_PATTERN.matcher(normalized).replaceAll(""); 
         
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < normalized.length(); i++) {
@@ -365,9 +367,6 @@ public class GboardService extends InputMethodService {
                 InputConnection ic = getCurrentInputConnection();
                 if (ic == null) return;
 
-                // =====================================================================
-                // --- NEW UNIFIED GLOBAL COMMAND INTERCEPTOR (100% TYPING PREVENTION) ---
-                // =====================================================================
                 if (rawKey.startsWith("CMD_")) {
                     if (rawKey.equals("CMD_OPEN_LAYOUTS")) {
                         if (keyboardView != null && keyboardView.layoutProfileSheet != null) {
@@ -402,10 +401,8 @@ public class GboardService extends InputMethodService {
                     else if (rawKey.equals("CMD_PASTE")) { ic.performContextMenuAction(android.R.id.paste); }
                     else if (rawKey.equals("CMD_CUT")) { ic.performContextMenuAction(android.R.id.cut); isSelectModeOn = false; }
                     
-                    return; // CRITICAL: Stop execution here so it DOES NOT type out the text!
+                    return; 
                 }
-                // =====================================================================
-
 
                 CustomKeyManager ckm = CustomKeyManager.getInstance(GboardService.this);
                 String actionType = ckm.getActionType(rawKey);

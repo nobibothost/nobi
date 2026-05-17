@@ -15,8 +15,63 @@ public class KeyboardRenderer {
     protected ProKeyboardView pkv;
     public long lastFrameTime = 0;
 
+    private Paint morePaint;
+    private Paint sepPaint;
+    private Paint dragShadow;
+    private Paint dragPaint;
+    private Paint doneBg;
+    private Paint whiteText;
+    private Paint hintPaint;
+    private Paint spaceBorderPaint;
+    private Paint popupHintPaint;
+    
+    private Path revealPath;
+    private Path spacePath;
+    
+    private RectF drawBounds;
+    private RectF tempRect;
+
     public KeyboardRenderer(ProKeyboardView pkv) {
         this.pkv = pkv;
+        initPaints();
+    }
+    
+    private void initPaints() {
+        morePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        morePaint.setStyle(Paint.Style.FILL);
+
+        sepPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+
+        dragShadow = new Paint(Paint.ANTI_ALIAS_FLAG);
+        dragShadow.setColor(Color.parseColor("#33000000"));
+
+        dragPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        dragPaint.setColor(Color.parseColor("#FFFFFF"));
+
+        doneBg = new Paint(Paint.ANTI_ALIAS_FLAG);
+        doneBg.setColor(Color.parseColor("#4A90E2"));
+
+        whiteText = new Paint(Paint.ANTI_ALIAS_FLAG);
+        whiteText.setColor(Color.WHITE);
+        whiteText.setTextAlign(Paint.Align.CENTER);
+        whiteText.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+
+        hintPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        hintPaint.setColor(Color.parseColor("#B0BEC5"));
+        hintPaint.setTextAlign(Paint.Align.CENTER);
+
+        spaceBorderPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        spaceBorderPaint.setStyle(Paint.Style.STROKE);
+        spaceBorderPaint.setStrokeCap(Paint.Cap.ROUND);
+        spaceBorderPaint.setStrokeJoin(Paint.Join.ROUND);
+
+        popupHintPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+
+        revealPath = new Path();
+        spacePath = new Path();
+        
+        drawBounds = new RectF();
+        tempRect = new RectF();
     }
 
     protected String getTruncatedText(String text, Paint paint, float maxWidth) {
@@ -63,9 +118,7 @@ public class KeyboardRenderer {
         
         float toolbarAreaWidth = pkv.getWidth() - toolbarHeight; 
         
-        Paint morePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         morePaint.setColor(pkv.themeManager.activeTheme != null ? pkv.themeManager.activeTheme.suggestionTextColor : Color.WHITE);
-        morePaint.setStyle(Paint.Style.FILL);
         float cxMore = pkv.getWidth() - (toolbarHeight / 2f);
         float cyMore = toolbarHeight / 2f;
         float r = pkv.dpToPx(2.5f);
@@ -91,13 +144,12 @@ public class KeyboardRenderer {
                 if (Math.abs(targetScale - item.scale) > 0.01f) needsRedraw = true;
 
                 if (!item.isDragging) {
-                    RectF bounds = new RectF(item.currentX, item.currentY, item.currentX + activeSlotWidth, item.currentY + toolbarHeight);
-                    drawIconCenter(canvas, item.icon, bounds, item.scale);
+                    tempRect.set(item.currentX, item.currentY, item.currentX + activeSlotWidth, item.currentY + toolbarHeight);
+                    drawIconCenter(canvas, item.icon, tempRect, item.scale);
                 }
             }
         } else {
             if (pkv.suggestionManager.currentSuggestions.size() >= 3) {
-                Paint sepPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
                 sepPaint.setColor(pkv.themeManager.activeTheme != null ? pkv.themeManager.activeTheme.specialKeyBgColor : Color.parseColor("#D4DADC"));
                 sepPaint.setStrokeWidth(pkv.dpToPx(1.5f));
                 float ey = toolbarHeight / 2f;
@@ -149,7 +201,7 @@ public class KeyboardRenderer {
             
             if (physicalLabel.equals("ENTER") && !key.isPressed) currentBgPaint = pkv.themeManager.enterBgPaint;
 
-            RectF drawBounds = new RectF(key.bounds);
+            drawBounds.set(key.bounds);
             float currentScale = 1.0f - (key.scaleProgress * 0.04f);
             float dx = drawBounds.width() * (1f - currentScale) / 2f;
             float dy = drawBounds.height() * (1f - currentScale) / 2f;
@@ -198,22 +250,20 @@ public class KeyboardRenderer {
             else if (physicalLabel.equals("LANG")) drawIconCenter(canvas, pkv.themeManager.iconLanguage, drawBounds, pkv.resizeController.userHeightScale);
             else if (physicalLabel.equals("SPACE")) {
                 if (pkv.currentMode == ProKeyboardView.MODE_NUMBER) {
-                    Paint p2 = new Paint(Paint.ANTI_ALIAS_FLAG);
-                    p2.setStyle(Paint.Style.STROKE);
-                    p2.setStrokeWidth(pkv.dpToPx(2) * pkv.resizeController.userHeightScale);
-                    p2.setColor(pkv.themeManager.textPaint.getColor());
-                    p2.setStrokeCap(Paint.Cap.ROUND);
-                    p2.setStrokeJoin(Paint.Join.ROUND);
+                    spaceBorderPaint.setStrokeWidth(pkv.dpToPx(2) * pkv.resizeController.userHeightScale);
+                    spaceBorderPaint.setColor(pkv.themeManager.textPaint.getColor());
+                    
                     float ccx = drawBounds.centerX();
                     float ccy = drawBounds.centerY();
                     float spaceW = pkv.dpToPx(10) * pkv.resizeController.userHeightScale; 
                     float spaceH = pkv.dpToPx(4) * pkv.resizeController.userHeightScale; 
-                    Path path = new Path();
-                    path.moveTo(ccx - spaceW, ccy - spaceH);
-                    path.lineTo(ccx - spaceW, ccy + spaceH);
-                    path.lineTo(ccx + spaceW, ccy + spaceH);
-                    path.lineTo(ccx + spaceW, ccy - spaceH);
-                    canvas.drawPath(path, p2);
+                    
+                    spacePath.reset();
+                    spacePath.moveTo(ccx - spaceW, ccy - spaceH);
+                    spacePath.lineTo(ccx - spaceW, ccy + spaceH);
+                    spacePath.lineTo(ccx + spaceW, ccy + spaceH);
+                    spacePath.lineTo(ccx + spaceW, ccy - spaceH);
+                    canvas.drawPath(spacePath, spaceBorderPaint);
                 } else {
                     pkv.themeManager.textPaint.setTextSize(pkv.dpToPx(14) * pkv.resizeController.userHeightScale);
                     int origColor = pkv.themeManager.textPaint.getColor();
@@ -238,7 +288,6 @@ public class KeyboardRenderer {
                     pkv.themeManager.textPaint.setTextSize(pkv.dpToPx(24) * pkv.resizeController.userHeightScale);
                     pkv.themeManager.textPaint.setTypeface(android.graphics.Typeface.DEFAULT);
                     
-                    // Universal scale fit
                     float maxTextWidth = drawBounds.width() - pkv.dpToPx(4);
                     float textWidth = pkv.themeManager.textPaint.measureText(displayLabel);
                     if (textWidth > maxTextWidth && textWidth > 0) {
@@ -251,7 +300,6 @@ public class KeyboardRenderer {
                     float initialSize = pkv.dpToPx(12) * pkv.resizeController.userHeightScale;
                     pkv.themeManager.textPaint.setTextSize(initialSize);
 
-                    // Universal scale fit
                     float maxTextWidth = drawBounds.width() - pkv.dpToPx(6); 
                     float textWidth = pkv.themeManager.textPaint.measureText(displayLabel);
                     if (textWidth > maxTextWidth && textWidth > 0) {
@@ -269,7 +317,6 @@ public class KeyboardRenderer {
                         pkv.themeManager.textPaint.setTypeface(android.graphics.Typeface.DEFAULT);
                     }
 
-                    // Universal scale fit (Guarantees zero overflow)
                     float maxTextWidth = drawBounds.width() - pkv.dpToPx(6); 
                     float textWidth = pkv.themeManager.textPaint.measureText(displayLabel);
                     if (textWidth > maxTextWidth && textWidth > 0) {
@@ -294,18 +341,18 @@ public class KeyboardRenderer {
             }
 
             if (hintText != null && !hintText.isEmpty()) {
-                Paint hintPaint = new Paint(pkv.themeManager.textPaint);
-                hintPaint.setTypeface(android.graphics.Typeface.DEFAULT);
-                hintPaint.clearShadowLayer();
-                hintPaint.setTextSize(pkv.dpToPx(10) * pkv.resizeController.userHeightScale);
+                popupHintPaint.set(pkv.themeManager.textPaint);
+                popupHintPaint.setTypeface(android.graphics.Typeface.DEFAULT);
+                popupHintPaint.clearShadowLayer();
+                popupHintPaint.setTextSize(pkv.dpToPx(10) * pkv.resizeController.userHeightScale);
                 
                 if (pkv.themeManager.activeTheme != null) {
-                    hintPaint.setColor(pkv.themeManager.activeTheme.suggestionTextColor);
+                    popupHintPaint.setColor(pkv.themeManager.activeTheme.suggestionTextColor);
                 } else {
-                    hintPaint.setColor(Color.parseColor("#4A90E2"));
+                    popupHintPaint.setColor(Color.parseColor("#4A90E2"));
                 }
                 
-                canvas.drawText(hintText, drawBounds.right - pkv.dpToPx(8), drawBounds.top + pkv.dpToPx(12), hintPaint);
+                canvas.drawText(hintText, drawBounds.right - pkv.dpToPx(8), drawBounds.top + pkv.dpToPx(12), popupHintPaint);
             }
 
             boolean isPopupEligible = (effLabel.length() == 1 && Character.isLetterOrDigit(effLabel.charAt(0))) || isEmojiKey || isSlangKey;
@@ -327,7 +374,7 @@ public class KeyboardRenderer {
             float maxRadius = (float) Math.hypot(cxMore, pkv.getHeight() - cyMore);
             float currentRadius = maxRadius * pkv.toolbarManager.panelScale;
             
-            Path revealPath = new Path();
+            revealPath.reset();
             revealPath.addCircle(cxMore, cyMore, currentRadius, Path.Direction.CW);
             canvas.clipPath(revealPath);
             
@@ -354,34 +401,31 @@ public class KeyboardRenderer {
 
                 if (!item.isDragging) {
                     float drawY = toolbarHeight + item.currentY;
-                    RectF bounds = new RectF(item.currentX, drawY, item.currentX + inactiveColWidth, drawY + inactiveRowHeight - pkv.dpToPx(24));
-                    drawIconCenter(canvas, item.icon, bounds, item.scale);
-                    canvas.drawText(item.label, bounds.centerX(), bounds.bottom + pkv.dpToPx(16), pkv.themeManager.textPaint);
+                    tempRect.set(item.currentX, drawY, item.currentX + inactiveColWidth, drawY + inactiveRowHeight - pkv.dpToPx(24));
+                    drawIconCenter(canvas, item.icon, tempRect, item.scale);
+                    canvas.drawText(item.label, tempRect.centerX(), tempRect.bottom + pkv.dpToPx(16), pkv.themeManager.textPaint);
                 }
             }
             canvas.restore();
         }
 
         if (pkv.toolbarManager.activeDragItem != null && pkv.toolbarManager.activeDragItem.isDragging) {
-            Paint dragShadow = new Paint(Paint.ANTI_ALIAS_FLAG);
-            dragShadow.setColor(Color.parseColor("#33000000"));
-            
             float renderX = pkv.toolbarManager.activeDragItem.currentX;
             float renderY = pkv.toolbarManager.activeDragItem.currentY;
             float sWidth = (pkv.toolbarManager.dragPointerY < toolbarHeight) ? (toolbarAreaWidth / Math.max(1, pkv.toolbarManager.activeTools.size() + 1)) : (pkv.getWidth() / 4f);
             float sHeight = (pkv.toolbarManager.dragPointerY < toolbarHeight) ? toolbarHeight : pkv.dpToPx(80);
             float finalRenderY = (pkv.toolbarManager.dragPointerY < toolbarHeight) ? renderY : (toolbarHeight + renderY);
 
-            RectF dragBounds = new RectF(renderX, finalRenderY, renderX + sWidth, finalRenderY + sHeight);
+            tempRect.set(renderX, finalRenderY, renderX + sWidth, finalRenderY + sHeight);
             
-            canvas.drawRoundRect(dragBounds, pkv.dpToPx(8), pkv.dpToPx(8), dragShadow);
-            drawIconCenter(canvas, pkv.toolbarManager.activeDragItem.icon, dragBounds, pkv.toolbarManager.activeDragItem.scale);
+            canvas.drawRoundRect(tempRect, pkv.dpToPx(8), pkv.dpToPx(8), dragShadow);
+            drawIconCenter(canvas, pkv.toolbarManager.activeDragItem.icon, tempRect, pkv.toolbarManager.activeDragItem.scale);
 
             if (pkv.toolbarManager.dragPointerY >= toolbarHeight) {
                 pkv.themeManager.textPaint.setTextSize(pkv.dpToPx(12));
                 pkv.themeManager.textPaint.clearShadowLayer();
                 pkv.themeManager.textPaint.setTypeface(android.graphics.Typeface.DEFAULT);
-                canvas.drawText(pkv.toolbarManager.activeDragItem.label, dragBounds.centerX(), dragBounds.bottom - pkv.dpToPx(8), pkv.themeManager.textPaint);
+                canvas.drawText(pkv.toolbarManager.activeDragItem.label, tempRect.centerX(), tempRect.bottom - pkv.dpToPx(8), pkv.themeManager.textPaint);
             }
         }
 
@@ -390,25 +434,14 @@ public class KeyboardRenderer {
             float resizeCx = pkv.getWidth() / 2f;
             float resizeCy = pkv.getHeight() / 2f;
 
-            Paint dragPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-            dragPaint.setColor(Color.parseColor("#FFFFFF"));
             canvas.drawRoundRect(resizeCx - pkv.dpToPx(30), pkv.dpToPx(10), resizeCx + pkv.dpToPx(30), pkv.dpToPx(15), pkv.dpToPx(2.5f), pkv.dpToPx(2.5f), dragPaint);
             
-            Paint doneBg = new Paint(Paint.ANTI_ALIAS_FLAG);
-            doneBg.setColor(Color.parseColor("#4A90E2"));
             RectF doneBounds = pkv.resizeController.getDoneButtonBounds(pkv.getWidth(), pkv.getHeight());
             canvas.drawRoundRect(doneBounds, pkv.dpToPx(24), pkv.dpToPx(24), doneBg);
             
-            Paint whiteText = new Paint(Paint.ANTI_ALIAS_FLAG);
-            whiteText.setColor(Color.WHITE);
-            whiteText.setTextAlign(Paint.Align.CENTER);
             whiteText.setTextSize(pkv.dpToPx(16));
-            whiteText.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
             canvas.drawText("Done", doneBounds.centerX(), doneBounds.centerY() - ((whiteText.descent() + whiteText.ascent()) / 2), whiteText);
             
-            Paint hintPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-            hintPaint.setColor(Color.parseColor("#B0BEC5"));
-            hintPaint.setTextAlign(Paint.Align.CENTER);
             hintPaint.setTextSize(pkv.dpToPx(14));
             canvas.drawText("Drag up or down to resize keyboard", resizeCx, doneBounds.top - pkv.dpToPx(20), hintPaint);
             return;

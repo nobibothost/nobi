@@ -58,6 +58,45 @@ public class KeyboardTouchHandler {
         this.pkv = pkv;
     }
 
+    // NEW FIX: Helper method to perfectly sync Visual Popups and Actions based on Active Layout
+    private String[] getActivePopups(String physicalLabel, String effLabel, CustomKeyManager ckm) {
+        String[] customPopups = ckm.getPopups(physicalLabel);
+        boolean hasExplicitPopups = false;
+        if (customPopups != null) {
+            for (String p : customPopups) {
+                if (p != null && !p.trim().isEmpty()) { hasExplicitPopups = true; break; }
+            }
+        }
+        
+        if (hasExplicitPopups) {
+            String center = (customPopups[0] != null && !customPopups[0].isEmpty()) ? customPopups[0] : effLabel;
+            String up = (customPopups.length > 1 && customPopups[1] != null && !customPopups[1].isEmpty()) ? customPopups[1] : center;
+            String down = (customPopups.length > 2 && customPopups[2] != null && !customPopups[2].isEmpty()) ? customPopups[2] : center;
+            String left = (customPopups.length > 3 && customPopups[3] != null && !customPopups[3].isEmpty()) ? customPopups[3] : center;
+            String right = (customPopups.length > 4 && customPopups[4] != null && !customPopups[4].isEmpty()) ? customPopups[4] : center;
+            return new String[]{center, up, down, left, right};
+        } else {
+            String[] defaultPopups = KeyboardLayouts.getPopups(effLabel);
+            if (defaultPopups != null) {
+                String center = (defaultPopups.length > 0 && defaultPopups[0] != null) ? defaultPopups[0] : effLabel;
+                String up = (defaultPopups.length > 1 && defaultPopups[1] != null) ? defaultPopups[1] : center;
+                String down = (defaultPopups.length > 2 && defaultPopups[2] != null) ? defaultPopups[2] : center;
+                String left = (defaultPopups.length > 3 && defaultPopups[3] != null) ? defaultPopups[3] : center;
+                String right = (defaultPopups.length > 4 && defaultPopups[4] != null) ? defaultPopups[4] : center;
+                return new String[]{center, up, down, left, right};
+            } else if (KeyboardData.SWIPE_EMOJIS.containsKey(effLabel)) {
+                String[] defaultEmojis = KeyboardData.SWIPE_EMOJIS.get(effLabel);
+                String center = (defaultEmojis.length > 0 && defaultEmojis[0] != null) ? defaultEmojis[0] : effLabel;
+                String up = (defaultEmojis.length > 1 && defaultEmojis[1] != null) ? defaultEmojis[1] : center;
+                String down = (defaultEmojis.length > 2 && defaultEmojis[2] != null) ? defaultEmojis[2] : center;
+                String left = (defaultEmojis.length > 3 && defaultEmojis[3] != null) ? defaultEmojis[3] : center;
+                String right = (defaultEmojis.length > 4 && defaultEmojis[4] != null) ? defaultEmojis[4] : center;
+                return new String[]{center, up, down, left, right};
+            }
+        }
+        return null;
+    }
+
     public boolean handleTouch(MotionEvent event) {
         if (pkv.clipboardBottomSheet != null && pkv.clipboardBottomSheet.isShowing()) return true;
         if (pkv.textEditingSheet != null && pkv.textEditingSheet.isShowing()) return true;
@@ -294,11 +333,16 @@ public class KeyboardTouchHandler {
                     return true;
                 }
                 
-                // FIXED: Removed strict mode checks. Maps handle existence natively.
-                boolean isEmojiSwipeMove = pkv.swipeEmojiManager.swipeEmojis.containsKey(activeKey != null ? activeKey.label : "");
-                boolean isSymbolSwipeMove = pkv.swipeSymbolManager.swipeSymbols.containsKey(activeKey != null ? activeKey.label : "");
+                // NEW FIX: Dynamic swipe eligibility calculation (Replaces stale static maps)
+                boolean isSwipeEligible = false;
+                if (activeKey != null) {
+                    CustomKeyManager ckm = CustomKeyManager.getInstance(pkv.getContext());
+                    String effLabelMove = ckm.getLabel(activeKey.label);
+                    if (effLabelMove == null || effLabelMove.isEmpty()) effLabelMove = activeKey.label;
+                    isSwipeEligible = getActivePopups(activeKey.label, effLabelMove, ckm) != null;
+                }
 
-                if (isLongPressTriggered && activeKey != null && (isEmojiSwipeMove || isSymbolSwipeMove)) {
+                if (isLongPressTriggered && activeKey != null && isSwipeEligible) {
                     float dx = x - keyTouchDownX;
                     float dy = y - keyTouchDownY;
                     float threshold = pkv.dpToPx(20);
@@ -397,33 +441,34 @@ public class KeyboardTouchHandler {
                 handler.removeCallbacksAndMessages(null);
 
                 if (activeKey != null) {
-                    String label = activeKey.label;
+                    String physicalLabel = activeKey.label;
+                    
+                    CustomKeyManager ckm = CustomKeyManager.getInstance(pkv.getContext());
+                    String effLabel = ckm.getLabel(physicalLabel);
+                    if (effLabel == null || effLabel.isEmpty()) effLabel = physicalLabel;
 
-                    // FIXED: Removed strict mode checks
-                    boolean isEmojiSwipeUp = pkv.swipeEmojiManager.swipeEmojis.containsKey(label);
-                    boolean isSymbolSwipeUp = pkv.swipeSymbolManager.swipeSymbols.containsKey(label);
+                    // Fetch dynamically resolved popups array to avoid static map bugs
+                    String[] activePopups = getActivePopups(physicalLabel, effLabel, ckm);
 
-                    if (isLongPressTriggered && (isEmojiSwipeUp || isSymbolSwipeUp)) {
-                        if (isEmojiSwipeUp) {
-                            String selectedEmoji = pkv.swipeEmojiManager.swipeEmojis.get(label)[currentSwipeDirection];
-                            // Using standard commit, not "EMOJI_INPUT:" mapping
-                            if (pkv.listener != null) pkv.listener.onKeyClick(selectedEmoji);
-                        } else {
-                            String selectedSymbol = pkv.swipeSymbolManager.swipeSymbols.get(label)[currentSwipeDirection];
+                    if (isLongPressTriggered && activePopups != null) {
+                        String selectedSymbol = activePopups[currentSwipeDirection];
+                        if (selectedSymbol != null && !selectedSymbol.isEmpty()) {
                             if (pkv.listener != null) pkv.listener.onKeyClick(selectedSymbol);
                         }
                     } 
-                    else if (!isLongPressTriggered || !label.equals("DEL")) { 
-                        if (label.equals("?123")) { pkv.currentMode = ProKeyboardView.MODE_SYMBOLS;
+                    else if (!isLongPressTriggered || !physicalLabel.equals("DEL")) { 
+                        
+                        // New Logic: Check effLabel directly for rearranged System features!
+                        if (effLabel.equals("?123")) { pkv.currentMode = ProKeyboardView.MODE_SYMBOLS;
                             pkv.requestLayout(); pkv.layoutManager.buildKeys(); } 
-                        else if (label.equals("=\\<")) { pkv.currentMode = ProKeyboardView.MODE_SYMBOLS_PAGE_2;
+                        else if (effLabel.equals("=\\<")) { pkv.currentMode = ProKeyboardView.MODE_SYMBOLS_PAGE_2;
                             pkv.layoutManager.buildKeys(); } 
-                        else if (label.equals("ABC")) { pkv.currentMode = ProKeyboardView.MODE_TEXT;
+                        else if (effLabel.equals("ABC")) { pkv.currentMode = ProKeyboardView.MODE_TEXT;
                             pkv.requestLayout(); pkv.layoutManager.buildKeys(); } 
-                        else if (label.equals("EMOJI")) { 
+                        else if (effLabel.equals("EMOJI")) { 
                             if (pkv.emojiSheet != null) pkv.emojiSheet.show(pkv.getWidth() / 2f, pkv.getHeight() / 2f);
                         } 
-                        else if (label.equals("SHIFT")) {
+                        else if (effLabel.equals("SHIFT")) {
                             long now = System.currentTimeMillis();
                             if (pkv.isCapsLock) { 
                                 pkv.isCapsLock = false; 
@@ -439,18 +484,19 @@ public class KeyboardTouchHandler {
                             }
                             pkv.lastShiftPressTime = now;
                         } else if (pkv.listener != null) {
-                            String textToCommit = label;
-                            if (label.length() == 1 && Character.isLetter(label.charAt(0)) && pkv.currentMode == ProKeyboardView.MODE_TEXT) {
-                                textToCommit = (pkv.isShifted || pkv.isCapsLock) ? label.toUpperCase() : label.toLowerCase();
-                            // FIXED: Replaced ProKeyboardView with KeyboardData
-                            } else if (Arrays.asList(KeyboardData.TOP_ROW_SLANG).contains(label)) {
-                                textToCommit = (pkv.isShifted || pkv.isCapsLock) ? label.toUpperCase() : label.toLowerCase();
+                            String textToCommit = physicalLabel;
+                            if (physicalLabel.length() == 1 && Character.isLetter(physicalLabel.charAt(0)) && pkv.currentMode == ProKeyboardView.MODE_TEXT) {
+                                textToCommit = (pkv.isShifted || pkv.isCapsLock) ? physicalLabel.toUpperCase() : physicalLabel.toLowerCase();
+                            } else if (Arrays.asList(KeyboardData.TOP_ROW_SLANG).contains(physicalLabel)) {
+                                textToCommit = (pkv.isShifted || pkv.isCapsLock) ? physicalLabel.toUpperCase() : physicalLabel.toLowerCase();
                                 textToCommit += " "; 
                             }
+                            
                             if (pkv.themeManager.activeFont != null && pkv.currentMode == ProKeyboardView.MODE_TEXT && !pkv.themeManager.activeFont.name.equals("Default")) {
                                 textToCommit = FontData.convertText(textToCommit, pkv.themeManager.activeFont);
                             }
-                            pkv.listener.onKeyClick(textToCommit);
+                            
+                            pkv.listener.onKeyClick(textToCommit); // GboardService will intercept and handle mappings!
                         }
                     }
                     activeKey.isPressed = false;
@@ -489,14 +535,12 @@ public class KeyboardTouchHandler {
     private KeyData findKeyAt(float x, float y) {
         if (y < pkv.getToolbarHeight() || pkv.toolbarManager.isMoreFeaturesOpen) return null;
         
-        // 1. Strict Hit Test (Accurate touch bounds detection without expanding)
         for (KeyData key : pkv.keys) {
             if (key.bounds.contains(x, y)) {
                 return key;
             }
         }
         
-        // 2. Proximity Hit Test (If touch falls into gaps between keys)
         KeyData closestKey = null;
         float minDistance = Float.MAX_VALUE;
         float maxAllowedDistSq = pkv.dpToPx(40) * pkv.dpToPx(40); 
